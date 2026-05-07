@@ -37,12 +37,9 @@ class VDSTTrainer(DistributedTrainer):
     
     def _create_model(self, config, loss):
         model = VDST(config, loss)
-        
+
+        init_module_weights(model)
         init_transformer_weights(model.transformer)
-        init_module_weights(model.pose_encoder_source)
-        init_module_weights(model.pose_encoder_query)
-        init_module_weights(model.image_decoder)
-        init_module_weights(model.depth_decoder)
         
         return model
     

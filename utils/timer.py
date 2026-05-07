@@ -30,6 +30,7 @@ class Timer:
             'n_deltas': self._n_deltas,
             'delta': self.delta,
             'avg_delta': self.avg_delta,
+            'total': self.total,
             'last_time': self._last_time,
             'total_steps': self.total_steps,
         }
@@ -38,5 +39,6 @@ class Timer:
         self._n_deltas = state_dict['n_deltas']
         self.delta = state_dict['delta']
         self.avg_delta = state_dict['avg_delta']
+        self.total = state_dict['total']
         self._last_time = state_dict['last_time']
         self.total_steps = state_dict['total_steps']

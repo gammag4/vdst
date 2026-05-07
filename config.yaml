@@ -1,0 +1,144 @@
+# Configs for setting up train/eval environments
+setup:
+  # Chooses whether to benchmark kernels
+  # TODO Disabled for now since the input data will have variable sizes
+  # TODO check if it is rerunning benchmarks
+  benchmark_kernels: false
+  # Uses only deterministic algorithms, impacts performance a lot
+  use_deterministic_algorithms: false
+  # Sets precision for float32 operations in CUDA matmul and cuDNN convolutions
+  # 'highest' disables tf32
+  # 'high' and 'medium' enable tf32
+  tf32_level: high
+  # Seed for computations
+  seed: 42
+
+  amp:
+    # Enables/disables AMP
+    enabled: true
+    # Sets AMP data type
+    dtype: [(obj), torch.bfloat16]
+
+  # Enables/disables grad scaling
+  grad_scaler: false
+
+  distributed:
+    # # Device used in current process. It is automatically computed
+    # device: null
+    # # Number of threads running in each process, already computed from cpu count and topology
+    # num_threads: null
+    # Torchrun already sets local and global ranks as environment variables
+    # Number of process in the process group
+    world_size: [(env), WORLD_SIZE, 1]
+    # Number of processes locally
+    local_world_size: [(env), LOCAL_WORLD_SIZE, 1]
+    # Id of current process globally
+    rank: [(env), RANK, 0]
+    # Id of current process locally
+    local_rank: [(env), LOCAL_RANK, 0]
+    # Timeout for ddp process group
+    timeout: 1800
+
+train:
+  # How many train steps to run in each epoch
+  n_steps: 500000
+  # Display logs every n steps
+  display_log_steps_interval: 10
+
+  optimizer:
+    # Number of warmup steps before going to cosine learning rate
+    n_warmup_steps: 3000
+    # Learning rate
+    lr: 4e-4
+    # AdamW betas
+    betas: [0.999, 0.999]
+    # AdamW weight decay
+    weight_decay: 0.01
+    # Fused kernels
+    fused: true # TODO Some places report issues so check if this gives errors or nans
+
+  grad_clipping:
+    # Types: null, 'abs', 'std'
+    type: std
+    # Maximum gradient std allowed before clipping
+    clip_std: 1.8 # when using std
+    # Maximum gradient std allowed before skipping
+    skip_std: 4.0 # when using std
+    # # Maximum gradient norm allowed before clipping
+    # clip_norm: 2.0 # when using abs
+    # # Maximum gradient norm allowed before skipping
+    # skip_norm: 5.0 # when using abs
+  
+  logger:
+    project_name: VDST
+    run_name: vdst
+
+  checkpoints:
+    # Folder in which to save checkpoints
+    path: results/checkpoints/
+    # Whether to load only weights, should be false only for checkpoints from trusted sources
+    weights_only: false
+    # Save checkpoints after every n steps (forward/backward pass)
+    checkpoint_steps_interval: 1000
+    # Save intermediate results after every n steps
+    results_steps_interval: 1000
+
+  data:
+    # Num workers per GPU
+    num_workers: 4
+    prefetch_factor: 16
+    shuffle: true
+    pin_memory: false
+    batch_size: 4
+
+    n_sources: 2
+    n_targets: 8
+
+    # Datasets
+    datasets:
+      wildrgbd:
+        path: ./datasets/wildrgbd/
+        # n_sources: 2
+        # n_targets: 6
+        # resize_to: [256, 256] # TODO
+
+  loss: # TODO
+
+# Default model configuration
+model:
+  # Patch side length (the images will be broken into patches of size p x p)
+  p: 8
+  # Number of color channels in each frame
+  C: 3
+  # Whether to use plucker rays or raw origin-direction vector pairs
+  use_plucker: true
+
+  # Number of layers in transformer
+  n_layers: 24
+  # Dimension of all the vector representations used in the transformer models (dim for all vector inputs in transformers, not just the embedding vectors that will be the latent representations of scenes, idk why did i put such a confusing name but yeah)
+  d_model: 768
+  # Dimension of vector representations in the attention space of transformer block (normally chosen to be equal to d_model)
+  d_attn: 768
+  # Number of attention heads in both encoder and decoder (n_heads should divide d_model)
+  n_heads: 12
+  # Expansion factor for mlp blocks after attention blocks in each transformer block (embeddings will be expanded to e_ff * d_model dimensions then contracted back to d_model dimensions)
+  e_ff: 4
+  qk_norm:
+    # Enables QK-Norm
+    enabled: true
+    # Epsilon for QK-Norm computation
+    eps: 1e-12
+  # Operation used for attention, should be from xops.fmha
+  attn_op: [(obj), xformers.ops.fmha.MemoryEfficientAttentionFlashAttentionOp]
+  # Enable/disable layer norm in enc layers
+  enc_layer_norm: false # TODO check with it
+  # Enable/disable layer norm in dec layers
+  dec_layer_norm: false # TODO check with it
+  # Whether to normalize images and depths to mean 0 std 1 before inputting to the network and denormalize after output
+  standardize_inputs: false # TODO check with it
+  # Enable/disable activation checkpointing
+  use_activation_checkpointing: true
+
+  train:
+    # Dropout rate
+    dropout: 0.0 # TODO test separate dropouts for each layer

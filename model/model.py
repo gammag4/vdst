@@ -34,23 +34,26 @@ class VDST(nn.Module):
         self.pose_encoder_source = PoseEncoder(is_query_encoder=False, config=self.config)
         self.pose_encoder_query = PoseEncoder(is_query_encoder=True, config=self.config)
         
-        image_decoder = [
-            nn.Linear(
-                in_features=self.config.d_model,
-                out_features=self.config.C * self.config.p ** 2
-            )
-        ]
-        depth_decoder = [
-            nn.Linear(
-                in_features=self.config.d_model,
-                out_features=self.config.p ** 2
-            )
-        ]
         if self.config.dec_layer_norm:
-            image_decoder = [nn.LayerNorm(self.config.d_model)] + image_decoder
-            depth_decoder = [nn.LayerNorm(self.config.d_model)] + depth_decoder
-        self.image_decoder = nn.Sequential(*image_decoder)
-        self.depth_decoder = nn.Sequential(*depth_decoder)
+            self.image_decoder_norm = nn.Sequential(
+                nn.LayerNorm(self.config.d_model),
+                nn.Linear(in_features=self.config.d_model, out_features=self.config.d_model, bias=False)
+            ) if self.config.dec_residual_layer_norm else nn.LayerNorm(self.config.d_model)
+            self.depth_decoder_norm = nn.Sequential(
+                nn.LayerNorm(self.config.d_model),
+                nn.Linear(in_features=self.config.d_model, out_features=self.config.d_model, bias=False)
+            ) if self.config.dec_residual_layer_norm else nn.LayerNorm(self.config.d_model)
+        
+        self.image_decoder_linear = nn.Linear(
+            in_features=self.config.d_model,
+            out_features=self.config.C * self.config.p ** 2,
+            bias=False
+        )
+        self.depth_decoder_linear = nn.Linear(
+            in_features=self.config.d_model,
+            out_features=self.config.p ** 2,
+            bias=False
+        )
         
         self.loss = loss
     
@@ -117,8 +120,15 @@ class VDST(nn.Module):
         out_embeds = self.transformer(in_embeds)
         out_embeds = out_embeds[..., -query_embeds.shape[-2]:, :]
         out_embeds = out_embeds.reshape(orig_query_shape)
+
+        if self.config.dec_layer_norm:
+            norm_out_img_embeds, norm_out_depth_embeds = self.image_decoder_norm(out_embeds), self.depth_decoder_norm(out_embeds)
+            if self.config.dec_residual_layer_norm:
+                norm_out_img_embeds, norm_out_depth_embeds = norm_out_img_embeds + out_embeds, norm_out_depth_embeds + out_embeds
+        else:
+            norm_out_img_embeds, norm_out_depth_embeds = out_embeds, out_embeds
+        out_image_embeds, out_depth_embeds = self.image_decoder_linear(norm_out_img_embeds), self.depth_decoder_linear(norm_out_depth_embeds)
         
-        out_image_embeds, out_depth_embeds = self.image_decoder(out_embeds), self.depth_decoder(out_embeds)
         out_images_padded, out_depths_padded = [
             einx.rearrange(
                 '... (h w) (c p1 p2) -> ... c (h p1) (w p2)',

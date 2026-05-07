@@ -93,15 +93,19 @@ class PoseEncoder(nn.Module):
         self.use_plucker = self.config.use_plucker
 
         c = 0 if self.is_query_encoder else self.C + 1
-        embed_encoder = [
-            nn.Linear(
-                in_features=(6 + c) * self.p ** 2,
-                out_features=self.d_model
-            )
-        ]
+        in_features = (6 + c) * self.p ** 2
+        
         if self.config.enc_layer_norm:
-            embed_encoder = [nn.LayerNorm((6 + c) * self.p ** 2)] + embed_encoder
-        self.embed_encoder = nn.Sequential(*embed_encoder)
+            self.embed_encoder_norm = nn.Sequential(
+                nn.LayerNorm(in_features),
+                nn.Linear(in_features=in_features, out_features=in_features, bias=False)
+            ) if self.config.enc_residual_layer_norm else nn.LayerNorm(in_features)
+        
+        self.embed_encoder_linear = nn.Linear(
+            in_features=in_features,
+            out_features=self.d_model,
+            bias=False
+        )
 
     # HW = tuple with height and width
     # Set both if image has been resized, specifying original image height and width in HW
@@ -158,7 +162,14 @@ class PoseEncoder(nn.Module):
     # We assume images are in type float with colors in range 0-1
     def forward(self, batch):
         embeds, depth_masks, pad = self.create_embeds(batch)
-        embeds = self.embed_encoder(embeds)
+        
+        if self.config.enc_layer_norm:
+            out_embeds = self.embed_encoder_norm(embeds)
+            if self.config.enc_residual_layer_norm:
+                out_embeds = out_embeds + embeds
+        else:
+            out_embeds = embeds
+        out_embeds = self.embed_encoder_linear(out_embeds)
 
         # (B, n_lat, d_model), (...B, C, H, W), (4,)
-        return embeds, depth_masks, pad
+        return out_embeds, depth_masks, pad

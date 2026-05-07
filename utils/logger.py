@@ -34,7 +34,7 @@ class Logger(ABC):
             self.iteration_vars = {**self.iteration_vars, **vars}
     
     @abstractmethod
-    def log_images(self, paths, captions):
+    def log_image(self, path, name):
         pass
     
     def log_global(self, vars: dict):
@@ -86,7 +86,7 @@ class StandardLogger(PrintLogger):
     def _log_vars(self, vars):
         self.logs.append(vars)
     
-    def log_images(self, paths, captions):
+    def log_image(self, path, name):
         raise Exception('Cant log images')
 
     def state_dict(self):
@@ -107,9 +107,8 @@ class WandbLogger(PrintLogger):
     def _log_vars(self, vars):
         wandb.log(vars, step=self.current_step)
     
-    def log_images(self, paths, captions):
-        images = [wandb.Image(p, caption=c) for p, c in zip(paths, captions)]
-        wandb.log({'images': images}, step=self.current_step)
+    def log_image(self, path, name):
+        wandb.log({name: wandb.Image(path, caption=name)}, step=self.current_step)
 
 
 # TODO ???

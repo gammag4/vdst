@@ -104,23 +104,16 @@ class VDSTTrainer(DistributedTrainer):
         
         path = os.path.join(self.config.train.checkpoints.path, 'intermediate_results', f'{self.logger.current_step}')
         os.makedirs(path, exist_ok=True)
-        source_images_path = os.path.join(path, 'source_images.png')
-        source_depths_path = os.path.join(path, 'source_depths.png')
-        target_images_path = os.path.join(path, 'target_images.png')
-        target_depths_path = os.path.join(path, 'target_depths.png')
         
-        for i, p in [
-            (source_images, source_images_path),
-            (source_depths, source_depths_path),
-            (target_images, target_images_path),
-            (target_depths, target_depths_path)
+        for img, name in [
+            (source_images, 'source_images'),
+            (source_depths, 'source_depths'),
+            (target_images, 'target_images'),
+            (target_depths, 'target_depths')
         ]:
-            i.save(p)
-        
-        self.logger.log_images(
-            [source_images_path, source_depths_path, target_images_path, target_depths_path],
-            ['source_images', 'source_depths', 'target_images', 'target_depths']
-        )
+            img_path = os.path.join(path, f'{name}.png')
+            img.save(img_path)
+            self.logger.log_image(img_path, name)
         
         with open(os.path.join(path, 'scenes.txt'), 'w', encoding='utf8') as f:
             f.write('\n'.join(res.scene_name))

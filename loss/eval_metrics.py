@@ -35,6 +35,11 @@ class EvalMetrics(nn.Module):
             r = metric(*[einx.id('... c h w -> (...) c h w', t) for t in (t1, t2)])
             return r.reshape(t1.shape[:-3])
         
+        valid_depth_count = reduce_sum(valid_depth_masks.float())
+
+        def reduce_mean_depth(t):
+            return reduce_sum(torch.where(valid_depth_masks, t, 0.0)) / valid_depth_count
+        
         diff = images - images_gt
         
         images_clamped = images.clamp(0, 1)
@@ -44,23 +49,17 @@ class EvalMetrics(nn.Module):
         images_ssim = compute_batch_metric(images_clamped, images_gt, self.ssim)
         images_lpips = compute_batch_metric(images_clamped, images_gt, self.lpips) # normalize=True already normalizes to (-1, 1) range
         
-        # these need to be masked later to prevent biases
-        depths_pos_masks = (depths > 0) & valid_depth_masks
-        depths_pos_count = reduce_sum(depths_pos_masks.float())
-        valid_depth_count = reduce_sum(valid_depth_masks.float())
+        # these need to be masked later
         depths_log = depths.log()
         depths_gt_log = depths_gt.log()
-        
-        def reduce_mean_depth(t, mask=depths_pos_masks, count=depths_pos_count):
-            return reduce_sum(torch.where(mask, t, 0.0)) / count
         
         diff = depths - depths_gt
         log_diff = depths_log - depths_gt_log
         
         threshold = torch.max((depths_gt / depths), (depths / depths_gt))
         
-        depths_abs_rel = reduce_mean_depth(diff.abs() / depths_gt, mask=valid_depth_masks, count=valid_depth_count)
-        depths_sq_rel = reduce_mean_depth((diff ** 2) / depths_gt, mask=valid_depth_masks, count=valid_depth_count)
+        depths_abs_rel = reduce_mean_depth(diff.abs() / depths_gt)
+        depths_sq_rel = reduce_mean_depth((diff ** 2) / depths_gt)
         
         depths_mse = reduce_mean(diff ** 2)
         depths_rmse = depths_mse.sqrt()

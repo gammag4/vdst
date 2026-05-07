@@ -33,6 +33,10 @@ class Logger(ABC):
         if self.is_main_process:
             self.iteration_vars = {**self.iteration_vars, **vars}
     
+    @abstractmethod
+    def log_images(self, paths, captions):
+        pass
+    
     def log_global(self, vars: dict):
         if self.is_main_process:
             self.global_vars = {**self.global_vars, **vars}
@@ -81,6 +85,9 @@ class StandardLogger(PrintLogger):
 
     def _log_vars(self, vars):
         self.logs.append(vars)
+    
+    def log_images(self, paths, captions):
+        raise Exception('Cant log images')
 
     def state_dict(self):
         state_dict = super().state_dict()
@@ -99,6 +106,10 @@ class WandbLogger(PrintLogger):
     
     def _log_vars(self, vars):
         wandb.log(vars, step=self.current_step)
+    
+    def log_images(self, paths, captions):
+        images = [wandb.Image(p, caption=c) for p, c in zip(paths, captions)]
+        wandb.log({'images': images}, step=self.current_step)
 
 
 # TODO ???

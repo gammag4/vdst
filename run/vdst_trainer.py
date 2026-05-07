@@ -117,6 +117,11 @@ class VDSTTrainer(DistributedTrainer):
         ]:
             i.save(p)
         
+        self.logger.log_images(
+            [source_images_path, source_depths_path, target_images_path, target_depths_path],
+            ['source_images', 'source_depths', 'target_images', 'target_depths']
+        )
+        
         with open(os.path.join(path, 'scenes.txt'), 'w', encoding='utf8') as f:
             f.write('\n'.join(res.scene_name))
         

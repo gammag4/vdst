@@ -92,7 +92,7 @@ class PoseEncoder(nn.Module):
         self.p = self.config.p
         self.use_plucker = self.config.use_plucker
 
-        c = 0 if self.is_query_encoder else self.C + 1
+        c = 0 if self.is_query_encoder else self.C + 1 if self.config.has_input_depths else self.C
         in_features = (6 + c) * self.p ** 2
         
         if self.config.enc_layer_norm:
@@ -127,8 +127,9 @@ class PoseEncoder(nn.Module):
         hw, pad = compute_pad(hw, self.p)
         if not self.is_query_encoder:
             images = F.pad(images, pad, 'constant', 0)
-            depths = F.pad(depths, pad, 'constant', 0)
-            depth_masks = F.pad(depth_masks, pad, 'constant', False)
+            if self.config.has_input_depths:
+                depths = F.pad(depths, pad, 'constant', 0)
+                depth_masks = F.pad(depth_masks, pad, 'constant', False)
 
         o, d = compute_view_rays(K, R, t, pad, hw)
         plucker_rays = compute_plucker_rays(o, d, self.use_plucker)  # (B, 6, H, W)
@@ -142,12 +143,20 @@ class PoseEncoder(nn.Module):
                 p1=self.p,
                 p2=self.p
             )
-        else:
+        elif self.config.has_input_depths:
             embeds = einx.rearrange(
                 '... c1 (h p1) (w p2), ... c2 (h p1) (w p2), ... c3 (h p1) (w p2) -> ... (h w) ((c1 + c2 + c3) p1 p2)',
                 plucker_rays,
                 images,
                 depths,
+                p1=self.p,
+                p2=self.p
+            )
+        else:
+            embeds = einx.rearrange(
+                '... c1 (h p1) (w p2), ... c2 (h p1) (w p2) -> ... (h w) ((c1 + c2) p1 p2)',
+                plucker_rays,
+                images,
                 p1=self.p,
                 p2=self.p
             )

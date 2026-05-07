@@ -112,6 +112,8 @@ model:
   C: 3
   # Whether to use plucker rays or raw origin-direction vector pairs
   use_plucker: true
+  # Whether the model also has input depths or if it tries to estimate depths just from source images
+  has_input_depths: true
 
   # Number of layers in transformer
   n_layers: 24

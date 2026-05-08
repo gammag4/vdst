@@ -119,6 +119,13 @@ class VDSTTrainer(DistributedTrainer):
             f.write('\n'.join(res.scene_name))
         
         eval_metrics = self.eval_metrics(res.gen_targets, res.targets, valid_depth_range=(0.001, 20))
+        
+        eval_metrics.num_images = eval_metrics.images.psnr.numel()
+        
+        for t in (eval_metrics.images, eval_metrics.depths):
+            for k in t.keys():
+                t[k] = t[k].mean().item()
+        
         self.logger.log({'eval_metrics': eval_metrics})
         
         with open(os.path.join(path, 'eval_metrics.yaml'), 'w', encoding='utf8') as f:

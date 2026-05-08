@@ -101,12 +101,11 @@ class EvalMetrics(nn.Module):
         
         for t in (image_metrics, depth_metrics):
             for k in t.keys():
-                t[k] = t[k].mean().item()
+                t[k] = t[k].cpu()
         
-        loss_metrics = edict(
+        eval_metrics = edict(
             images=image_metrics,
             depths=depth_metrics,
-            num_images=images.shape[:-3].numel()
         )
         
-        return loss_metrics
+        return eval_metrics

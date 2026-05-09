@@ -13,6 +13,7 @@ class Loss(nn.Module):
         super().__init__()
         
         self.model_config = model_config
+        self.config = loss_config
         # perceptual_weights = torch.tensor([1.6, 1.0, 0.8, 0.7, 0.5, 0.5, 0.5, 0.5, 0.5, 0.2])
         perceptual_weights = torch.full((8,), 1.0)
         self.perceptual = PerceptualLoss(perceptual_weights)
@@ -56,13 +57,7 @@ class Loss(nn.Module):
         
         # TODO adaptive weights with weighted average over time of losses proportional to how much of each there is
         # do something like beta * last + (1 - beta) * current
-        weights = [
-            3.0, # 1.0
-            0.5, # 0.5
-            1.0, # 0.5
-            1.0, # 0.5
-            0.4 # 0.2
-        ]
+        weights = self.config.weights
         losses = [
             image_mse_loss,
             image_perceptual_loss,

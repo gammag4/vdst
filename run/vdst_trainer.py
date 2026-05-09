@@ -138,7 +138,7 @@ class VDSTTrainer(DistributedTrainer):
         
         self.logger.log({
             'scene_names': batch.scene_name,
-            'optimizer_lrs': [p['lr'] for p in self.optimizer.param_groups],
+            'optimizer_lrs': {f'{i}': p['lr'] for i, p in enumerate(self.optimizer.param_groups)},
             'losses': {f'weighted_loss_{i}': w for i, w in enumerate(res.loss.weighted_losses.detach().tolist())}
         })
         

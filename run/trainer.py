@@ -9,6 +9,7 @@ from torch.utils.data.distributed import DistributedSampler
 from torch.nn.parallel import DistributedDataParallel as DDP  # DDP wrapper
 import torch.distributed as dist
 import torch.amp as amp
+from utils.grad_scaler import GradScaler
 
 from utils.other import print_model_stats, find_unused_model_params
 from utils.timer import Timer
@@ -304,7 +305,7 @@ class DistributedTrainer(ABC):
         self.model = DDP(training_args.model.to(self.device), device_ids=[self.local_rank])
 
         # Gradient scaler for AMP (probably not needed if using bfloat16)
-        self.grad_scaler = amp.GradScaler(
+        self.grad_scaler = GradScaler(
             device=self.device,
             enabled=self.amp_config.enabled and self.grad_scaler_enabled
         )

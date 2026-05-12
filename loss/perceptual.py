@@ -6,7 +6,7 @@ import torchvision.transforms.functional as VF
 
 
 class PerceptualLoss(nn.Module):
-    def __init__(self, layer_weights=torch.ones(8, dtype=torch.float32)):
+    def __init__(self, layer_weights=torch.ones(9, dtype=torch.float32)):
         super().__init__()
         
         weights = ConvNeXt_Tiny_Weights.DEFAULT
@@ -27,19 +27,21 @@ class PerceptualLoss(nn.Module):
         # This also sums over batch dim, unlike other models, to allow loss to be proportional to batch size
         # return torch.norm(x1 - x2, p=1, dim=-1).sum() / x1.shape[-1] # norm / C * H * W
         return (x1 - x2).abs().mean(dim=-1).sum() # norm / C * H * W
+        # return ((x1 - x2) ** 2).mean(dim=-1).sum() # norm / C * H * W
     
     def forward_layer(self, x1, x2):
         x1, x2 = [einx.rearrange('... c h w -> ... (c h w)', k) for k in (x1, x2)]
         
         return self.distance(x1, x2)
     
-    def forward(self, input, target):
+    def forward(self, input, target, use_raw_distance=True):
         losses = []
         
         input, target = [einx.rearrange('... c h w -> (...) c h w', k) for k in (input, target)]
 
         x1, x2 = input, target
-        # losses.append(self.forward_layer(x1, x2)) # TODO check with image distance
+        if use_raw_distance:
+            losses.append(self.forward_layer(x1, x2)) # TODO check with image distance
         
         x1, x2 = [self.transforms(VF.center_crop(t, max(t.shape[-1], t.shape[-2]))) for t in (input, target)]
         for l in self.layers:
@@ -48,8 +50,10 @@ class PerceptualLoss(nn.Module):
         
         # losses.append(self.distance(self.classifier_layer(x1), self.classifier_layer(x2))) # TODO check w classifier layer
 
-        weights = self.layer_weights
+        weights = self.layer_weights if use_raw_distance else self.layer_weights[1:]
         weights = weights / weights.sum() # Normalizes weights
         
-        loss = (torch.stack(losses) * weights).sum()
-        return loss
+        losses = torch.stack(losses) * weights
+        loss = losses.sum()
+        
+        return loss, losses

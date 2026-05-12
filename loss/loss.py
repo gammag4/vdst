@@ -15,7 +15,7 @@ class Loss(nn.Module):
         self.model_config = model_config
         self.config = loss_config
         # perceptual_weights = torch.tensor([1.6, 1.0, 0.8, 0.7, 0.5, 0.5, 0.5, 0.5, 0.5, 0.2])
-        perceptual_weights = torch.full((8,), 1.0)
+        perceptual_weights = torch.full((9,), 1.0)
         self.perceptual = PerceptualLoss(perceptual_weights)
         
         self.eval()
@@ -51,7 +51,7 @@ class Loss(nn.Module):
         rlog, tlog = depths_log, depths_gt_log
         rlog, tlog = [(t - tlog.mean()) / tlog.std() for t in (rlog, tlog)]
         rlog, tlog = [einx.rearrange('... c2 h w -> (... c2) c h w', t, c=3) for t in (rlog, tlog)]
-        depth_perceptual_loss = self.perceptual(rlog, tlog)
+        depth_perceptual_loss = self.perceptual(rlog, tlog, use_raw_distance=False)
         
         # TODO add SSI error
         

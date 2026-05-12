@@ -32,7 +32,7 @@ class Loss(nn.Module):
         images_clamped = images
         # if self.model_config.model.standardize_inputs: #TODO check standardized with this
         #     images_clamped = images.clamp(0, 1)
-        image_perceptual_loss = self.perceptual(images_clamped, images_gt)
+        image_perceptual_loss, weighted_image_perceptual_losses = self.perceptual(images_clamped, images_gt)
         
         # these need to be masked later to prevent biases
         depths_log = torch.where(depths_gt_masks, depths.log(), 0.0)  # always valid bc output is exp
@@ -51,7 +51,7 @@ class Loss(nn.Module):
         rlog, tlog = depths_log, depths_gt_log
         rlog, tlog = [(t - tlog.mean()) / tlog.std() for t in (rlog, tlog)]
         rlog, tlog = [einx.rearrange('... c2 h w -> (... c2) c h w', t, c=3) for t in (rlog, tlog)]
-        depth_perceptual_loss = self.perceptual(rlog, tlog, use_raw_distance=False)
+        depth_perceptual_loss, weighted_depth_perceptual_losses = self.perceptual(rlog, tlog, use_raw_distance=False)
         
         # TODO add SSI error
         
@@ -71,6 +71,8 @@ class Loss(nn.Module):
         res = edict(
             loss=loss,
             weighted_losses=weighted_losses,
+            weighted_image_perceptual_losses=weighted_image_perceptual_losses,
+            weighted_depth_perceptual_losses=weighted_depth_perceptual_losses,
             # image_mse_loss=image_mse_loss,
             # image_perceptual_loss=image_perceptual_loss,
             # depth_silog_loss_train=depth_silog_loss_train,

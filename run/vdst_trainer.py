@@ -140,7 +140,9 @@ class VDSTTrainer(DistributedTrainer):
         self.logger.log({
             'scene_names': batch.scene_name,
             'optimizer_lrs': {f'{i}': p['lr'] for i, p in enumerate(self.optimizer.param_groups)},
-            'losses': {f'weighted_loss_{i}': w for i, w in enumerate(res.loss.weighted_losses.detach().tolist())}
+            'weighted_losses': {f'{i}': w for i, w in enumerate(res.loss.weighted_losses.detach().tolist())},
+            'weighted_image_perceptual_losses': {f'{i}': w for i, w in enumerate(res.loss.weighted_image_perceptual_losses.detach().tolist())},
+            'weighted_depth_perceptual_losses': {f'{i}': w for i, w in enumerate(res.loss.weighted_depth_perceptual_losses.detach().tolist())}
         })
         
         if self.rank == 0 and self.logger.current_step % self.config.train.checkpoints.results_steps_interval == 0:

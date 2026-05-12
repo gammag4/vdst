@@ -12,7 +12,7 @@ import einx
 
 
 class WildRGBDDataset(Dataset):
-    def __init__(self, path, n_sources, n_targets):
+    def __init__(self, path, n_sources, n_targets, seed=42):
         self.path = path
         self.n_sources = n_sources
         self.n_targets = n_targets
@@ -22,11 +22,15 @@ class WildRGBDDataset(Dataset):
         cpaths = [(c, cpath) for c, cpath in cpaths if os.path.isdir(cpath)]
         spaths = [(f'{c}_{s}', os.path.join(cpath, 'scenes', s)) for c, cpath in cpaths for s in os.listdir(os.path.join(cpath, 'scenes'))]
         self.spaths = [(sname, spath) for sname, spath in spaths if os.path.isdir(spath)]
+        
+        self.seed = seed
+        self.random = random.Random(seed)
     
     def __len__(self):
         return len(self.spaths)
     
     def __getitem__(self, i):
+        self.random.seed(self.seed + i)
         sname, spath = self.spaths[i]
         
         with open(os.path.join(spath, 'metadata'), 'r', encoding='utf8') as f:
@@ -40,7 +44,7 @@ class WildRGBDDataset(Dataset):
             w2cs = [torch.linalg.inv(torch.tensor([float(i) for i in l.strip().split()[1:]]).reshape(4, 4)) for l in lines]
             R, t = zip(*((w2c[:3, :3], w2c[:3, 3]) for w2c in w2cs))
         
-        images, depths, R, t = zip(*random.sample(list(zip(images, depths, R, t)), self.n_sources + self.n_targets))
+        images, depths, R, t = zip(*self.random.sample(list(zip(images, depths, R, t)), self.n_sources + self.n_targets))
         images, depths = [[torch.from_numpy(np.array(PIL.Image.open(path))) for path in paths] for paths in (images, depths)]
         
         images = [einx.rearrange('h w c -> c h w', image).float() / 255.0 for image in images]

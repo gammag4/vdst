@@ -27,7 +27,8 @@ class VDSTTrainer(DistributedTrainer):
             self.eval_metrics = EvalMetrics().to(self.device)
     
     def _create_dataset(self, config):
-        dataset = WildRGBDDataset(config.datasets.wildrgbd.path, config.n_sources, config.n_targets)
+        dataset = WildRGBDDataset(config.datasets.wildrgbd.path, config.n_sources, config.n_targets, seed=self.config.setup.seed)
+        
         return dataset
     
     def _create_loss(self, model_config, loss_config, n_steps):

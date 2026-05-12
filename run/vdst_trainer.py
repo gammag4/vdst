@@ -15,6 +15,7 @@ from utils.other import edict_to_dict
 from run.trainer import DistributedTrainer
 from model.model import VDST
 from loss.loss import Loss
+from loss.scheduler import PerceptualLossScheduler
 from loss.eval_metrics import EvalMetrics
 from dataset.wildrgbd import WildRGBDDataset
 
@@ -39,8 +40,9 @@ class VDSTTrainer(DistributedTrainer):
     
     def _create_loss(self, model_config, loss_config, n_steps):
         loss = Loss(model_config, loss_config)
+        loss_scheduler = PerceptualLossScheduler(loss, n_steps)
         
-        return (loss, None)
+        return loss, loss_scheduler
     
     def _create_model(self, config, loss):
         model = VDST(config, loss)
@@ -163,6 +165,7 @@ class VDSTTrainer(DistributedTrainer):
         self.logger.log({
             'scene_names': batch.scene_name,
             'optimizer_lrs': {f'{i}': p['lr'] for i, p in enumerate(self.optimizer.param_groups)},
+            'loss_weights': {f'{i}': w for i, w in enumerate(res.loss.loss_weights.detach().tolist())},
             'weighted_losses': {f'{i}': w for i, w in enumerate(res.loss.weighted_losses.detach().tolist())},
             'weighted_image_perceptual_losses': {f'{i}': w for i, w in enumerate(res.loss.weighted_image_perceptual_losses.detach().tolist())},
             'weighted_depth_perceptual_losses': {f'{i}': w for i, w in enumerate(res.loss.weighted_depth_perceptual_losses.detach().tolist())}

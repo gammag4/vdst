@@ -14,6 +14,7 @@ class Loss(nn.Module):
         
         self.model_config = model_config
         self.config = loss_config
+        self.weights = nn.Buffer(torch.tensor(self.config.weights))
         # perceptual_weights = torch.tensor([1.6, 1.0, 0.8, 0.7, 0.5, 0.5, 0.5, 0.5, 0.5)#, 0.2])
         perceptual_weights = torch.concat([torch.tensor([2.0]), torch.full((8,), 1.0)])
         self.perceptual = PerceptualLoss(layer_weights=perceptual_weights, dist_fn_raw=torch.square, dist_fn=torch.abs)
@@ -57,19 +58,20 @@ class Loss(nn.Module):
         
         # TODO adaptive weights with weighted average over time of losses proportional to how much of each there is
         # do something like beta * last + (1 - beta) * current
-        weights = self.config.weights
-        losses = [
+        weights = self.weights
+        losses = torch.stack([
             image_mse_loss,
             image_perceptual_loss,
             depth_silog_loss_train,
             depth_multiscale_grad_loss,
             depth_perceptual_loss
-        ]
-        weighted_losses = torch.stack([w * l for w, l in zip(weights, losses)])
-        loss = weighted_losses.sum() / sum(weights)
+        ])
+        weighted_losses = weights * losses
+        loss = weighted_losses.sum() / weights.sum()
         
         res = edict(
             loss=loss,
+            loss_weights=weights.data,
             weighted_losses=weighted_losses,
             weighted_image_perceptual_losses=weighted_image_perceptual_losses,
             weighted_depth_perceptual_losses=weighted_depth_perceptual_losses,

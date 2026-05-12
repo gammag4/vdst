@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Callable
 import torch
+import math
 
 from .loss import PerceptualLoss
 
@@ -65,13 +66,13 @@ def r3(beta, n_iter, i, perc_idx):
 
 
 # TODO
-class PerceptualLossScheduler(LossScheduler):
+class PerceptualLossScheduler2(LossScheduler):
     # Regime can be either:
     #   'constant': Weights are always constant
     #   'deep_to_shallow': Starts giving more weights to deeper layers and gradually goes to givin more weights to shallower ones in the end
     #   'shallow_to_deep': Starts giving more weights to shallower layers and gradually goes to givin more weights to deeper ones in the end
     def __init__(self, loss: PerceptualLoss, n_iter: int, beta: float=0.5, regime: str='constant'):
-        self.original_layer_weights = loss.layer_weights
+        self.original_weights = loss.layer_weights.data.clone()
         self.beta = beta
 
         if regime == 'deep_to_shallow':
@@ -87,5 +88,28 @@ class PerceptualLossScheduler(LossScheduler):
         super().__init__(loss, n_iter)
     
     def _update_loss(self):
+        if self.original_weights.device != self.loss.layer_weights.device:
+            self.original_weights = self.original_weights.to(self.loss.layer_weights.device)
+        
         perc_idx = torch.arange(self.loss.layer_weights.shape[0], device=self.loss.layer_weights.device)
-        self.loss.layer_weights = self.original_layer_weights * self.r(self.beta, self.n_iter, self.iter, perc_idx)
+        self.loss.layer_weights.copy_(self.original_weights * self.r(self.beta, self.n_iter, self.iter, perc_idx))
+
+
+class PerceptualLossScheduler(LossScheduler):
+    def __init__(self, loss, n_iter):
+        self.original_weights = loss.weights.data.clone()
+        
+        super().__init__(loss, n_iter)
+    
+    def _update_loss(self):
+        if self.original_weights.device != self.loss.weights.device:
+            self.original_weights = self.original_weights.to(self.loss.weights.device)
+        
+        perc = min(1.0, 1.3 * self.iter / self.n_iter) # 1.3 is to make it fall faster than the cosine lr
+        c = math.cos((perc - 1) * math.pi) / 2 + 0.5
+        r = 0.2
+        fall1 = (r - 1) * c + 1  # goes from 1 to r
+        fall2 = 1 - c # goes from 1 to 0
+        weights = torch.tensor([1.0, fall1, 1.0, 1.0, fall2], device=self.loss.weights.device)
+        weights = self.original_weights * weights
+        self.loss.weights.copy_(weights)

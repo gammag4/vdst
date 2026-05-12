@@ -28,7 +28,8 @@ class DistributedTrainer(ABC):
         self.n_steps = self.config.train.n_steps
         
         self.last_grad_norms = torch.tensor([], dtype=torch.float32)
-        self.data = None
+        self.train_data = None
+        self.val_data = None
         self.loss_scheduler = None
         self.lr_scheduler = None
         self.optimizer = None
@@ -39,13 +40,13 @@ class DistributedTrainer(ABC):
         self.current_epoch = 0
         self.current_epoch_step = 0
 
-    def _create_dataloader(self, dataset: Dataset):
+    def _create_dataloader(self, dataset: Dataset, train_dataloader=True):
         config = self.config.train.data
 
         # TODO check if this loader works with ddp. seems to work, but needs to check with multiple gpus
         return StatefulDataLoader(
             dataset,
-            batch_size=config.batch_size,
+            batch_size=config.train_batch_size if train_dataloader else config.val_batch_size,
             # Shuffle should be defined in sampler when using DistributedSampler
             shuffle=False,
             # Sampler that sends different batches to different gpus
@@ -59,7 +60,8 @@ class DistributedTrainer(ABC):
 
     def state_dict(self):
         state_dict = {
-            'data': self.data.state_dict(),
+            'train_data': self.train_data.state_dict(),
+            'val_data': None if self.val_data is None else self.val_data.state_dict(),
             'loss_scheduler': None if self.loss_scheduler is None else self.loss_scheduler.state_dict(),
             'lr_scheduler': self.lr_scheduler.state_dict(),
             'optimizer': self.optimizer.state_dict(),
@@ -74,7 +76,8 @@ class DistributedTrainer(ABC):
         return state_dict
 
     def load_state_dict(self, state_dict):
-        self.data.load_state_dict(state_dict['data'])
+        self.train_data.load_state_dict(state_dict['train_data'])
+        self.val_data.load_state_dict(state_dict['val_data'])
         if state_dict['loss_scheduler'] is not None:
             self.loss_scheduler.load_state_dict(state_dict['loss_scheduler'])
         self.lr_scheduler.load_state_dict(state_dict['lr_scheduler'])
@@ -229,7 +232,7 @@ class DistributedTrainer(ABC):
     # This method is run after each pass to update stuff
     def _step(self):
         self.timer.update()
-
+        
         self.logger.log({'time': {
             'total': self.timer.total,
             'delta': self.timer.delta,
@@ -238,19 +241,22 @@ class DistributedTrainer(ABC):
             'total_str': str(datetime.timedelta(seconds=self.timer.total)),
             'eta_str': str(datetime.timedelta(seconds=self.timer.eta))
         }})
-
+        
         if self.loss_scheduler is not None:
             self.loss_scheduler.step()
-
+        
         if self.lr_scheduler is not None:
             self.lr_scheduler.step()
-
+    
     # Use this method to run one forward/backward pass for a generic model
     def _run_pass(self, batch):
         self._run_pass_once(batch)
-
+        
         self._step()
 
+        if self.logger.current_step % self.config.train.val_steps_interval == 0:
+            self._val()
+        
         if self.rank == 0 and self.logger.current_step % self.config.train.display_log_steps_interval == 0:
             torch.accelerator.synchronize(self.device)
             self.logger.display_current()
@@ -258,24 +264,24 @@ class DistributedTrainer(ABC):
         self.logger.update()
         
         self.current_epoch_step += 1
-
+        
         self._try_save_checkpoint()
-
+    
     def _train(self):
         # Setting sampler epoch at beginning of each epoch before creating DataLoader iterator is necessary for shuffling to work in distributed mode across multiple epochs
         # See: https://docs.pytorch.org/docs/stable/data.html
-
-        self.data.sampler.set_epoch(self.current_epoch)
-        it = iter(self.data)
+        self.train_data.sampler.set_epoch(self.current_epoch)
+        it = iter(self.train_data)
+        
         for _ in range(self.n_steps):
             try:
                 batch = next(it)
             except StopIteration:
-                it = iter(self.data)
+                it = iter(self.train_data)
                 batch = next(it)
                 self.current_epoch += 1
                 self.current_epoch_step = 0
-                self.data.sampler.set_epoch(self.current_epoch)
+                self.train_data.sampler.set_epoch(self.current_epoch)
             
             self.logger.log({
                 'epoch': self.current_epoch,
@@ -283,40 +289,57 @@ class DistributedTrainer(ABC):
             })
             
             self._run_pass(batch)
+    
+    # Should check and only save stuff at rank 0
+    @abstractmethod
+    def _run_eval(self, data_iter):
+        pass
+    
+    def _val(self):
+        self.model.eval()
+        
+        self.val_data.sampler.set_epoch(0)
 
+        with amp.autocast(device_type=self.device, dtype=self.amp_config.dtype, enabled=self.amp_config.enabled), torch.no_grad():
+            if self.rank == 0:
+                self._run_eval(iter(self.val_data))
+        
+        self.model.train()
+    
     @abstractmethod
     def _init_training(self):
         pass
-
+    
     async def run(self):
         print(f'Starting run "{self.config.train.logger.project_name} - {self.config.train.logger.run_name}"')
         
         training_args = self._init_training()
-
-        self.data = self._create_dataloader(training_args.dataset)
+        
+        self.train_data = self._create_dataloader(training_args.train_dataset, train_dataloader=True)
+        self.val_data = self._create_dataloader(training_args.val_dataset, train_dataloader=False)
         self.loss_scheduler = training_args.loss_scheduler
         self.optimizer = training_args.optimizer
         self.lr_scheduler = training_args.lr_scheduler
         self.logger = training_args.logger
-
+        
         # We wrap the model with DDP, giving the GPU IDs where the model is (only in local_rank in this case)
         # This also works for multi-GPU models, but in that case, device_ids and output_device must NOT be set,
         # these should be sent to the proper devices by either the application or by model.forward()
         self.model = DDP(training_args.model.to(self.device), device_ids=[self.local_rank])
-
+        
         # Gradient scaler for AMP (probably not needed if using bfloat16)
         self.grad_scaler = GradScaler(
             device=self.device,
             enabled=self.amp_config.enabled and self.grad_scaler_enabled
         )
-
+        
         self.timer = Timer(self.n_steps)
-
+        
         # When using torchrun, we need load and save checkpoint logic because when any of the processes fail, torchrun restarts all of them at the last existing checkpoint
         # Starts from checkpoint if exists
         self._try_load_checkpoint()
-
+        
         if self.rank == 0:
             print_model_stats(self.model, print_all_named_params=False)
-
+        
         return self._train()

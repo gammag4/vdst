@@ -26,10 +26,16 @@ class VDSTTrainer(DistributedTrainer):
         if self.rank == 0:
             self.eval_metrics = EvalMetrics().to(self.device)
     
-    def _create_dataset(self, config):
-        dataset = WildRGBDDataset(config.datasets.wildrgbd.path, config.n_sources, config.n_targets, seed=self.config.setup.seed)
+    def _create_datasets(self, config):
+        train_dataset = WildRGBDDataset(config.datasets.wildrgbd.path, config.n_sources, config.n_targets, seed=self.config.setup.seed)
+        val_dataset = WildRGBDDataset(config.datasets.wildrgbd.path, config.n_sources, config.n_targets, seed=self.config.setup.seed)
+        train_dataset.random.shuffle(train_dataset.spaths)
+        val_dataset.random.shuffle(val_dataset.spaths)
         
-        return dataset
+        n_split = config.val_batch_size # Picking n scenes for validation
+        train_dataset.spaths, val_dataset.spaths = train_dataset.spaths[n_split:], val_dataset.spaths[:n_split]
+        
+        return train_dataset, val_dataset
     
     def _create_loss(self, model_config, loss_config, n_steps):
         loss = Loss(model_config, loss_config)
@@ -70,14 +76,15 @@ class VDSTTrainer(DistributedTrainer):
         return WandbLogger(self.config.train.logger.project_name, self.config.train.logger.run_name, self.config, self.rank == 0)
     
     def _init_training(self):
-        dataset = self._create_dataset(self.config.train.data)
+        train_dataset, val_dataset = self._create_datasets(self.config.train.data)
         loss, loss_scheduler = self._create_loss(self.config.model, self.config.train.loss, self.n_steps)
         model = self._create_model(self.config.model, loss)
         optimizer, lr_scheduler = self._create_optimizer(self.config.train.optimizer, model, self.n_steps)
         logger = self._create_logger()
         
         return edict(
-            dataset=dataset,
+            train_dataset=train_dataset,
+            val_dataset=val_dataset,
             loss_scheduler=loss_scheduler,
             model=model,
             optimizer=optimizer,
@@ -85,10 +92,10 @@ class VDSTTrainer(DistributedTrainer):
             logger=logger,
         )
     
-    def _save_intermediate_results(self, res):
-        source_images, source_depths = res.sources.images, res.sources.depths
-        target_gen_images, target_gen_depths = res.gen_targets.images, res.gen_targets.depths
-        target_gt_images, target_gt_depths = res.targets.images, res.targets.depths
+    def _save_intermediate_results(self, path, batch_index, batch_res):
+        source_images, source_depths = batch_res.sources.images, batch_res.sources.depths
+        target_gen_images, target_gen_depths = batch_res.gen_targets.images, batch_res.gen_targets.depths
+        target_gt_images, target_gt_depths = batch_res.targets.images, batch_res.targets.depths
         
         source_images, source_depths = [einx.rearrange('b v c h w -> (b h) (v w) c', t) for t in (source_images, source_depths)]
         
@@ -103,36 +110,52 @@ class VDSTTrainer(DistributedTrainer):
         
         source_images, target_images, source_depths, target_depths = [PIL.Image.fromarray((t * 255.0).astype(np.uint8)) for t in (source_images, target_images, source_depths, target_depths)]
         
-        path = os.path.join(self.config.train.checkpoints.path, 'intermediate_results', f'{self.logger.current_step}')
-        os.makedirs(path, exist_ok=True)
-        
         for img, name in [
-            (source_images, 'source_images'),
-            (source_depths, 'source_depths'),
-            (target_images, 'target_images'),
-            (target_depths, 'target_depths')
+            (source_images, f'source_images_{batch_index}'),
+            (source_depths, f'source_depths_{batch_index}'),
+            (target_images, f'target_images_{batch_index}'),
+            (target_depths, f'target_depths_{batch_index}')
         ]:
             img_path = os.path.join(path, f'{name}.png')
             img.save(img_path)
             self.logger.log_image(img_path, name)
         
+        with open(os.path.join(path, 'scenes.txt'), 'a', encoding='utf8') as f:
+            f.write('\n'.join(batch_res.scene_name) + '\n')
+    
+    def _run_eval(self, data_iter):
+        path = os.path.join(self.config.train.checkpoints.path, 'intermediate_results', f'{self.logger.current_step}')
+        os.makedirs(path, exist_ok=True)
+        
         with open(os.path.join(path, 'scenes.txt'), 'w', encoding='utf8') as f:
-            f.write('\n'.join(res.scene_name))
+            f.write('')
         
-        eval_metrics = self.eval_metrics(res.gen_targets, res.targets, valid_depth_range=(0.001, 20))
+        eval_metricss = []
+        for i, batch in enumerate(data_iter):
+            batch_res = self.model(batch)
+            
+            self._save_intermediate_results(path, i, batch_res)
+            
+            eval_metrics = self.eval_metrics(batch_res.gen_targets, batch_res.targets, valid_depth_range=(0.001, 20))
+            eval_metrics.num_images = eval_metrics.images.psnr.numel()
+            
+            eval_metricss.append(eval_metrics)
         
-        eval_metrics.num_images = eval_metrics.images.psnr.numel()
+        eval_metrics = edict()
         
-        for t in (eval_metrics.images, eval_metrics.depths):
-            for k in t.keys():
-                t[k] = t[k].mean().item()
+        for k1 in [i for i in eval_metricss[0].keys() if i != 'num_images']:
+            for k2 in eval_metricss[0][k1].keys():
+                v = eval_metrics.get(k1, edict())
+                v[k2] = torch.concat([e[k1][k2] for e in eval_metricss], dim=0).mean().item()
+        
+        eval_metrics.num_images = sum([e.num_images for e in eval_metricss])
         
         self.logger.log({'eval_metrics': eval_metrics})
         
         with open(os.path.join(path, 'eval_metrics.yaml'), 'w', encoding='utf8') as f:
             yaml.dump(edict_to_dict(eval_metrics), f, default_flow_style=False, sort_keys=True)
         
-        self.logger.message(f'Saved intermediate results at {path}')
+        self.logger.message(f'Saved evaluation results at {path}')
     
     def _run_forward(self, batch):
         res = self.model(batch)
@@ -144,8 +167,5 @@ class VDSTTrainer(DistributedTrainer):
             'weighted_image_perceptual_losses': {f'{i}': w for i, w in enumerate(res.loss.weighted_image_perceptual_losses.detach().tolist())},
             'weighted_depth_perceptual_losses': {f'{i}': w for i, w in enumerate(res.loss.weighted_depth_perceptual_losses.detach().tolist())}
         })
-        
-        if self.rank == 0 and self.logger.current_step % self.config.train.checkpoints.results_steps_interval == 0:
-            self._save_intermediate_results(res)
         
         return res.loss.loss

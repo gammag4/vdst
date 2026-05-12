@@ -103,7 +103,11 @@ train:
         # n_targets: 6
         # resize_to: [256, 256] # TODO
 
-  loss: # TODO
+  loss:
+    # image_mse, image_perceptual, depth_silog, depth_multiscale, depth_perceptual
+    # weights: [3.0, 0.5, 1.0, 1.0, 0.4]
+    weights: [2.0, 1.0, 1.0, 1.0, 1.0]
+    # weights: [0.5, 1.0, 0.5, 1.0, 0.5]
 
 # Default model configuration
 model:

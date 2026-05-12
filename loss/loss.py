@@ -14,9 +14,9 @@ class Loss(nn.Module):
         
         self.model_config = model_config
         self.config = loss_config
-        # perceptual_weights = torch.tensor([1.6, 1.0, 0.8, 0.7, 0.5, 0.5, 0.5, 0.5, 0.5, 0.2])
-        perceptual_weights = torch.full((9,), 1.0)
-        self.perceptual = PerceptualLoss(perceptual_weights)
+        # perceptual_weights = torch.tensor([1.6, 1.0, 0.8, 0.7, 0.5, 0.5, 0.5, 0.5, 0.5)#, 0.2])
+        perceptual_weights = torch.concat([torch.tensor([2.0]), torch.full((8,), 1.0)])
+        self.perceptual = PerceptualLoss(layer_weights=perceptual_weights, dist_fn_raw=torch.square, dist_fn=torch.abs)
         
         self.eval()
         for param in self.parameters():
@@ -32,7 +32,7 @@ class Loss(nn.Module):
         images_clamped = images
         # if self.model_config.model.standardize_inputs: #TODO check standardized with this
         #     images_clamped = images.clamp(0, 1)
-        image_perceptual_loss, weighted_image_perceptual_losses = self.perceptual(images_clamped, images_gt)
+        image_perceptual_loss, weighted_image_perceptual_losses = self.perceptual(images_clamped, images_gt, use_raw_distance=False)
         
         # these need to be masked later to prevent biases
         depths_log = torch.where(depths_gt_masks, depths.log(), 0.0)  # always valid bc output is exp

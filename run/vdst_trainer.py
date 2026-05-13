@@ -150,8 +150,8 @@ class VDSTTrainer(DistributedTrainer):
         
         for k1 in [i for i in eval_metricss[0].keys() if i != 'num_images']:
             for k2 in eval_metricss[0][k1].keys():
-                v = eval_metrics.get(k1, edict())
-                v[k2] = torch.concat([e[k1][k2] for e in eval_metricss], dim=0).mean().item()
+                eval_metrics[k1] = eval_metrics.get(k1, edict())
+                eval_metrics[k1][k2] = torch.concat([e[k1][k2] for e in eval_metricss], dim=0).mean().item()
         
         eval_metrics.num_images = sum([e.num_images for e in eval_metricss])
         

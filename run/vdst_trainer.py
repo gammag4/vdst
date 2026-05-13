@@ -24,6 +24,9 @@ class VDSTTrainer(DistributedTrainer):
     def __init__(self, config):
         super().__init__(config)
         
+        self.val_batch_size = self.config.train.data.val_batch_size
+        self.val_split = 1 * self.val_batch_size # Picking n scenes for validation
+        
         if self.rank == 0:
             self.eval_metrics = EvalMetrics().to(self.device)
     
@@ -33,8 +36,7 @@ class VDSTTrainer(DistributedTrainer):
         train_dataset.random.shuffle(train_dataset.spaths)
         val_dataset.random.shuffle(val_dataset.spaths)
         
-        n_split = config.val_batch_size # Picking n scenes for validation
-        train_dataset.spaths, val_dataset.spaths = train_dataset.spaths[n_split:], val_dataset.spaths[:n_split]
+        train_dataset.spaths, val_dataset.spaths = train_dataset.spaths[self.val_split:], val_dataset.spaths[:self.val_split * 2] # One part for scenes not in training another for scenes in training
         
         return train_dataset, val_dataset
     
@@ -46,7 +48,7 @@ class VDSTTrainer(DistributedTrainer):
     
     def _create_model(self, config, loss):
         model = VDST(config, loss)
-
+        
         init_module_weights(model)
         init_transformer_weights(model.transformer)
         
@@ -112,11 +114,12 @@ class VDSTTrainer(DistributedTrainer):
         
         source_images, target_images, source_depths, target_depths = [PIL.Image.fromarray((t * 255.0).astype(np.uint8)) for t in (source_images, target_images, source_depths, target_depths)]
         
+        is_val_str = 'val' if batch_index < self.val_split // self.val_batch_size else 'train'
         for img, name in [
-            (source_images, f'source_images_{batch_index}'),
-            (source_depths, f'source_depths_{batch_index}'),
-            (target_images, f'target_images_{batch_index}'),
-            (target_depths, f'target_depths_{batch_index}')
+            (source_images, f'source_images_{batch_index}_{is_val_str}'),
+            (source_depths, f'source_depths_{batch_index}_{is_val_str}'),
+            (target_images, f'target_images_{batch_index}_{is_val_str}'),
+            (target_depths, f'target_depths_{batch_index}_{is_val_str}')
         ]:
             img_path = os.path.join(path, f'{name}.png')
             img.save(img_path)

@@ -50,7 +50,7 @@ class DistributedTrainer(ABC):
             # Shuffle should be defined in sampler when using DistributedSampler
             shuffle=False,
             # Sampler that sends different batches to different gpus
-            sampler=DistributedSampler(dataset, shuffle=config.shuffle),
+            sampler=DistributedSampler(dataset, shuffle=config.shuffle if train_dataloader else False),
             num_workers=config.num_workers,
             prefetch_factor=config.prefetch_factor,
             persistent_workers=True,

@@ -14,6 +14,7 @@ class Loss(nn.Module):
         
         self.model_config = model_config
         self.config = loss_config
+        self.silog_ms_lambda = 1.0 - self.config.silog.scale_lambda
         self.weights = nn.Buffer(torch.tensor(self.config.weights))
         # perceptual_weights = torch.tensor([1.6, 1.0, 0.8, 0.7, 0.5, 0.5, 0.5, 0.5, 0.5)#, 0.2])
         perceptual_weights = torch.concat([torch.tensor([2.0]), torch.full((8,), 1.0)])
@@ -44,7 +45,7 @@ class Loss(nn.Module):
         ldsm = (log_diff ** 2).mean()
         ldms = log_diff.mean() ** 2
         
-        depth_silog_loss_train = ldsm - 0.85 * ldms
+        depth_silog_loss_train = ldsm - self.silog_ms_lambda * ldms
         
         depth_multiscale_grad_loss = multiscale_grad_loss(depths_log, depths_gt_log, depths_gt_masks)
         

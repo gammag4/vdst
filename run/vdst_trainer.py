@@ -169,6 +169,7 @@ class VDSTTrainer(DistributedTrainer):
             'scene_names': batch.scene_name,
             'optimizer_lrs': {f'{i}': p['lr'] for i, p in enumerate(self.optimizer.param_groups)},
             'loss_weights': {f'{i}': w for i, w in enumerate(res.loss.loss_weights.detach().tolist())},
+            'raw_losses': {f'{i}': w for i, w in enumerate(res.loss.raw_losses.detach().tolist())},
             'weighted_losses': {f'{i}': w for i, w in enumerate(res.loss.weighted_losses.detach().tolist())},
             'weighted_image_perceptual_losses': {f'{i}': w for i, w in enumerate(res.loss.weighted_image_perceptual_losses.detach().tolist())},
             'weighted_depth_perceptual_losses': {f'{i}': w for i, w in enumerate(res.loss.weighted_depth_perceptual_losses.detach().tolist())}

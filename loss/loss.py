@@ -72,6 +72,7 @@ class Loss(nn.Module):
         res = edict(
             loss=loss,
             loss_weights=weights.data,
+            raw_losses=losses,
             weighted_losses=weighted_losses,
             weighted_image_perceptual_losses=weighted_image_perceptual_losses,
             weighted_depth_perceptual_losses=weighted_depth_perceptual_losses,

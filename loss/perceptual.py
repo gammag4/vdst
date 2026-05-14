@@ -29,8 +29,8 @@ class PerceptualLoss(nn.Module):
         # Then that score is used to know how well it is still maintaining information from previous frames in current latent embeds
         # This also sums over batch dim, unlike other models, to allow loss to be proportional to batch size
         # return torch.norm(x1 - x2, p=1, dim=-1).sum() / x1.shape[-1] # norm / C * H * W
-        return dist_fn(x1 - x2).mean(dim=-1).sum() # norm / C * H * W
-        # return ((x1 - x2) ** 2).mean(dim=-1).sum() # norm / C * H * W
+        return dist_fn(x1 - x2).mean(dim=-1) # norm / C * H * W
+        # return ((x1 - x2) ** 2).mean(dim=-1) # norm / C * H * W
     
     def forward_layer(self, x1, x2, dist_fn=torch.abs):
         x1, x2 = [einx.rearrange('... c h w -> ... (c h w)', k) for k in (x1, x2)]
@@ -56,7 +56,7 @@ class PerceptualLoss(nn.Module):
         weights = self.layer_weights if use_raw_distance else self.layer_weights[1:]
         weights = weights / weights.sum() # Normalizes weights
         
-        losses = torch.stack(losses) * weights
-        loss = losses.sum()
+        losses = torch.stack(losses, dim=-1) * weights
+        loss = losses.mean()
         
         return loss, losses

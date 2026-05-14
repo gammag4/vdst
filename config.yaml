@@ -108,8 +108,10 @@ train:
     # weights: [3.0, 0.5, 1.0, 1.0, 0.4]
     weights: [2.0, 1.0, 1.0, 1.0, 1.0]
     # weights: [0.5, 1.0, 0.5, 1.0, 0.5]
-    # Either 'constant' or 'falling_perceptual'
-    scheduler: 'falling_perceptual'
+    # Perceptual loss config
+    perceptual:
+      # Either 'constant' or 'falling_perceptual'
+      scheduler: 'falling_perceptual'
     # SILog loss config
     silog:
       # How much to penalize absolute scale errors

@@ -58,7 +58,7 @@ class EvalMetrics(nn.Module):
         depths_abs_rel = reduce_mean_depth(diff.abs() / depths_gt)
         depths_sq_rel = reduce_mean_depth((diff ** 2) / depths_gt)
         
-        depths_mse = reduce(einx.mean, diff ** 2)
+        depths_mse = reduce_mean_depth(diff ** 2)
         depths_rmse = depths_mse.sqrt()
         depths_rmse_log = reduce_mean_depth(log_diff ** 2).sqrt()
         

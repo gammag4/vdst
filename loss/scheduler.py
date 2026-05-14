@@ -96,12 +96,18 @@ class PerceptualLossScheduler2(LossScheduler):
 
 
 class PerceptualLossScheduler(LossScheduler):
-    def __init__(self, loss, n_iter):
+    def __init__(self, loss, n_iter, regime='falling_perceptual'):
+        self.regime = regime
         self.original_weights = loss.weights.data.clone()
+        
+        assert self.regime in ['constant', 'falling_perceptual'], f'Invalid loss scheduler regime: "{self.regime}"'
         
         super().__init__(loss, n_iter)
     
     def _update_loss(self):
+        if self.regime == 'constant':
+            return
+        
         if self.original_weights.device != self.loss.weights.device:
             self.original_weights = self.original_weights.to(self.loss.weights.device)
         

@@ -42,7 +42,7 @@ class VDSTTrainer(DistributedTrainer):
     
     def _create_loss(self, model_config, loss_config, n_steps):
         loss = Loss(model_config, loss_config)
-        loss_scheduler = PerceptualLossScheduler(loss, n_steps)
+        loss_scheduler = PerceptualLossScheduler(loss, n_steps, loss_config.scheduler)
         
         return loss, loss_scheduler
     

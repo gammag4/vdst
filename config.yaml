@@ -62,6 +62,8 @@ train:
   grad_clipping:
     # Types: null, 'abs', 'std'
     type: std
+    # Moving average window size
+    window_size: 100
     # Maximum gradient std allowed before clipping
     clip_std: 1.8 # when using std
     # Maximum gradient std allowed before skipping

@@ -149,8 +149,8 @@ class DistributedTrainer(ABC):
         
         assert self.grad_clipping_config.type in ['abs', 'std'], 'Invalid grad clipping config'
         
-        if len(self.last_grad_norms) > 50:
-            self.last_grad_norms = self.last_grad_norms[-50:]
+        if len(self.last_grad_norms) > self.grad_clipping_config.window_size:
+            self.last_grad_norms = self.last_grad_norms[-self.grad_clipping_config.window_size:]
         
         if len(self.last_grad_norms) >= 5:
             grad_norm_mean, grad_norm_std = self.last_grad_norms.mean().item(), self.last_grad_norms.std().item()

@@ -92,7 +92,16 @@ class PoseEncoder(nn.Module):
         self.p = self.config.p
         self.use_plucker = self.config.use_plucker
 
-        c = 0 if self.is_query_encoder else self.C + 1 if self.config.has_input_depths else self.C
+        c = 0
+        if not self.is_query_encoder:
+            c = self.C
+            
+            if self.config.has_input_depths:
+                c += 1
+                
+                if self.config.has_input_depth_masks:
+                    c += 1
+        
         in_features = (6 + c) * self.p ** 2
         
         if self.config.enc_layer_norm:
@@ -133,35 +142,34 @@ class PoseEncoder(nn.Module):
 
         o, d = compute_view_rays(K, R, t, pad, hw)
         plucker_rays = compute_plucker_rays(o, d, self.use_plucker)  # (B, 6, H, W)
+        
+        exp_inputs = [plucker_rays]
+        
+        if not self.is_query_encoder:
+            exp_inputs.append(images)
+            
+            if self.config.has_input_depths:
+                exp_inputs.append(depths)
+                
+                if self.config.has_input_depth_masks:
+                    exp_inputs.append(depth_masks.float())
+        
+        left_exp = ', '.join([f'... c{i} (h p1) (w p2)' for i in range(len(exp_inputs))])
+        right_exp = ' + '.join([f'c{i}' for i in range(len(exp_inputs))])
+        exp = f'{left_exp} -> ... (h w) (({right_exp}) p1 p2)'
 
         # Concatenating image with rays and rearranging into embeddings
         # (B, HW/p^2, (6 + C) * p^2)
-        if self.is_query_encoder:
-            embeds = einx.rearrange(
-                '... c (h p1) (w p2) -> ... (h w) (c p1 p2)',
-                plucker_rays,
-                p1=self.p,
-                p2=self.p
-            )
-        elif self.config.has_input_depths:
-            embeds = einx.rearrange(
-                '... c1 (h p1) (w p2), ... c2 (h p1) (w p2), ... c3 (h p1) (w p2) -> ... (h w) ((c1 + c2 + c3) p1 p2)',
-                plucker_rays,
-                images,
-                depths,
-                p1=self.p,
-                p2=self.p
-            )
-        else:
-            embeds = einx.rearrange(
-                '... c1 (h p1) (w p2), ... c2 (h p1) (w p2) -> ... (h w) ((c1 + c2) p1 p2)',
-                plucker_rays,
-                images,
-                p1=self.p,
-                p2=self.p
-            )
+        embeds = einx.rearrange(
+            # Full exp: '... c0 (h p1) (w p2), ... c1 (h p1) (w p2), ... c2 (h p1) (w p2), ... c3 (h p1) (w p2) -> ... (h w) ((c0 + c1 + c2 + c3) p1 p2)',
+            exp,
+            *exp_inputs,
+            p1=self.p,
+            p2=self.p
+        )
 
-        return embeds, depth_masks, pad  # (B, n_lat, d_model), (4,)
+        # (B, HW/p^2, (6 + C) * p^2), (...B, C, H, W), (4,)
+        return embeds, depth_masks, pad
 
     # HW = tuple with height and width
     # Set both if image has been resized, specifying original image height and width in HW

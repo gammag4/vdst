@@ -129,6 +129,9 @@ model:
   use_plucker: true
   # Whether the model also has input depths or if it tries to estimate depths just from source images
   has_input_depths: true
+  # Whether the model also has input depth masks to know whether pixels are valid or not
+  # This is ignored if has_input_depths = false
+  has_input_depth_masks: true
 
   # Number of layers in transformer
   n_layers: 24

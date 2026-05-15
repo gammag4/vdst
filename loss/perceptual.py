@@ -57,6 +57,7 @@ class PerceptualLoss(nn.Module):
         weights = weights / weights.sum() # Normalizes weights
         
         losses = torch.stack(losses, dim=-1) * weights
-        loss = losses.mean()
+        losses = einx.mean('... d -> d', losses)
+        loss = losses.sum()
         
         return loss, losses

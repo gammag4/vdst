@@ -1,3 +1,4 @@
+import os
 import asyncio
 import argparse
 from omegaconf import OmegaConf
@@ -25,11 +26,30 @@ async def main():
     load_dotenv()
     
     if args.experiments:
-        print('Running multiple experiments...')
-        
         experiments, setup_config = load_experiments_config(args.config, args.experiments, args.other)
-        for config, config_raw in experiments:
+        
+        os.makedirs(setup_config.out_path, exist_ok=True)
+        experiments_checkpoint_path = os.path.join(setup_config.out_path, 'checkpoint.txt')
+        
+        with open(experiments_checkpoint_path, 'r', encoding='utf8') as f:
+            res = f.read()
+            start_experiment_id = 0 if res == '' else int(res)
+            if start_experiment_id == len(experiments):
+                print('Experiments already ran.')
+                return
+        
+        print('Running experiments...\n')
+        
+        for i, (config, config_raw) in enumerate(experiments[start_experiment_id:]):
+            with open(experiments_checkpoint_path, 'w', encoding='utf8') as f:
+                f.write(str(i))
+            
             await run_experiment(config, config_raw)
+        
+        with open(experiments_checkpoint_path, 'w', encoding='utf8') as f:
+            f.write(str(i + 1))
+        
+        print('\nExperiments ended.')
     else:
         config, config_raw = load_config(args.config, args.other)
         await run_experiment(config, config_raw)

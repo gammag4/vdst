@@ -59,7 +59,7 @@ train:
     # AdamW weight decay
     weight_decay: 0.01
     # Fused kernels
-    fused: true # TODO Some places report issues so check if this gives errors or nans
+    fused: true
 
   grad_clipping:
     # Types: null, 'abs', 'std'
@@ -152,16 +152,16 @@ model:
   # Operation used for attention, should be from xops.fmha
   attn_op: [(obj), xformers.ops.fmha.MemoryEfficientAttentionFlashAttentionOp]
   # Enable/disable layer norm in enc layers
-  enc_layer_norm: false # TODO check with it
-  enc_residual_layer_norm: false # TODO check with it
+  enc_layer_norm: false
+  enc_residual_layer_norm: false
   # Enable/disable layer norm in dec layers
-  dec_layer_norm: false # TODO check with it
-  dec_residual_layer_norm: false # TODO check with it
+  dec_layer_norm: false
+  dec_residual_layer_norm: false
   # Whether to normalize images and depths to mean 0 std 1 before inputting to the network and denormalize after output
-  standardize_inputs: false # TODO check with it
+  standardize_inputs: false
   # Enable/disable activation checkpointing
   use_activation_checkpointing: true
 
   train:
     # Dropout rate
-    dropout: 0.0 # TODO test separate dropouts for each layer
+    dropout: 0.0

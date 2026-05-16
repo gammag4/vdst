@@ -24,11 +24,22 @@ class VDSTTrainer(DistributedTrainer):
     def __init__(self, config, config_raw):
         super().__init__(config, config_raw)
         
+        self.val_intermediate_results_steps = 0
+        
         self.val_batch_size = self.config.train.data.val_batch_size
         self.val_split = 1 * self.val_batch_size # Picking n scenes for validation
         
         if self.is_main_process:
             self.eval_metrics = EvalMetrics().to(self.device)
+    
+    def state_dict(self):
+        state_dict = super().state_dict()
+        state_dict['val_intermediate_results_steps'] = self.val_intermediate_results_steps
+        return state_dict
+    
+    def load_state_dict(self, state_dict):
+        self.val_intermediate_results_steps = state_dict['val_intermediate_results_steps']
+        return super().load_state_dict(state_dict)
     
     def _create_datasets(self, config):
         train_dataset, val_dataset = [
@@ -146,7 +157,10 @@ class VDSTTrainer(DistributedTrainer):
         for i, batch in enumerate(data_iter):
             batch_res = self.model(batch)
             
-            self._save_intermediate_results(path, i, batch_res)
+            if self.is_last or self.val_intermediate_results_steps % 10 == 0: # only saves results every 1/10th of the time
+                self._save_intermediate_results(path, i, batch_res)
+                self.val_intermediate_results_steps = 0
+            self.val_intermediate_results_steps += 1
             
             eval_metrics = self.eval_metrics(batch_res.gen_targets, batch_res.targets, valid_depth_range=(0.001, 20))
             eval_metrics.num_images = eval_metrics.images.psnr.numel()

@@ -47,7 +47,7 @@ train:
   # Display logs every n steps
   display_log_steps_interval: 10
   # Do evaluation and save results after every n steps
-  val_steps_interval: 1000
+  val_steps_interval: 100
 
   optimizer:
     # Number of warmup steps before going to cosine learning rate

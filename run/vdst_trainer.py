@@ -31,8 +31,15 @@ class VDSTTrainer(DistributedTrainer):
             self.eval_metrics = EvalMetrics().to(self.device)
     
     def _create_datasets(self, config):
-        train_dataset = WildRGBDDataset(config.datasets.wildrgbd.path, config.n_sources, config.n_targets, seed=self.config.setup.seed)
-        val_dataset = WildRGBDDataset(config.datasets.wildrgbd.path, config.n_sources, config.n_targets, seed=self.config.setup.seed)
+        train_dataset, val_dataset = [
+            WildRGBDDataset(
+                config.datasets.wildrgbd.path,
+                config.n_sources,
+                config.n_targets,
+                output_dims=config.output_dims,
+                seed=self.config.setup.seed
+            ) for _ in range(2)
+        ]
         train_dataset.random.shuffle(train_dataset.spaths)
         val_dataset.random.shuffle(val_dataset.spaths)
         

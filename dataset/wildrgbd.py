@@ -12,11 +12,11 @@ import einx
 
 
 class WildRGBDDataset(Dataset):
-    def __init__(self, path, n_sources, n_targets, seed=42):
+    def __init__(self, path, n_sources, n_targets, output_dims, seed=42):
         self.path = path
         self.n_sources = n_sources
         self.n_targets = n_targets
-        self.output_size = (192, 192) # TODO
+        self.output_dims = output_dims
         
         cpaths = [(c, os.path.join(path, c)) for c in os.listdir(path)]
         cpaths = [(c, cpath) for c, cpath in cpaths if os.path.isdir(cpath)]
@@ -53,7 +53,7 @@ class WildRGBDDataset(Dataset):
         images = [
             VF.resize(
                 VF.center_crop(t, output_size=[min(t.shape[-2:])] * 2),
-                size=self.output_size,
+                size=self.output_dims,
                 interpolation=InterpolationMode.BICUBIC, # TODO lanczos
                 antialias=True
             ).clamp(0, 1)
@@ -62,7 +62,7 @@ class WildRGBDDataset(Dataset):
         depths = [
             VF.resize(
                 VF.center_crop(t, output_size=[min(t.shape[-2:])] * 2),
-                size=self.output_size,
+                size=self.output_dims,
                 interpolation=InterpolationMode.NEAREST,
                 antialias=False
             )

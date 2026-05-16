@@ -97,6 +97,7 @@ train:
 
     n_sources: 2
     n_targets: 8
+    output_dims: [256, 256]
 
     # Datasets
     datasets:

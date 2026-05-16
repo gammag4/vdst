@@ -282,6 +282,8 @@ class DistributedTrainer(ABC):
         # See: https://docs.pytorch.org/docs/stable/data.html
         self.train_data.sampler.set_epoch(self.current_epoch)
         it = iter(self.train_data)
+
+        self.logger.start()
         
         for _ in range(self.n_real_steps):
             try:
@@ -300,6 +302,8 @@ class DistributedTrainer(ABC):
             })
             
             self._run_pass(batch)
+        
+        self.logger.end()
     
     @abstractmethod
     def _run_eval(self, data_iter):

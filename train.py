@@ -31,23 +31,28 @@ async def main():
         os.makedirs(setup_config.out_path, exist_ok=True)
         experiments_checkpoint_path = os.path.join(setup_config.out_path, 'checkpoint.txt')
         
-        with open(experiments_checkpoint_path, 'r', encoding='utf8') as f:
-            res = f.read()
-            start_experiment_id = 0 if res == '' else int(res)
-            if start_experiment_id == len(experiments):
-                print('Experiments already ran.')
-                return
+        try:
+            with open(experiments_checkpoint_path, 'r', encoding='utf8') as f:
+                res = f.read()
+                if res == 'ended':
+                    print('Experiments already ran.')
+                    return
+                start_experiment_id = int(res)
+        except FileNotFoundError:
+            start_experiment_id = 0
         
-        print('Running experiments...\n')
+        print('Running experiments ...\n')
         
-        for i, (config, config_raw) in enumerate(experiments[start_experiment_id:]):
+        for i, (config, config_raw) in enumerate(experiments[start_experiment_id:], start=start_experiment_id):
             with open(experiments_checkpoint_path, 'w', encoding='utf8') as f:
                 f.write(str(i))
+            
+            print(f'Running experiment {i} ...\n')
             
             await run_experiment(config, config_raw)
         
         with open(experiments_checkpoint_path, 'w', encoding='utf8') as f:
-            f.write(str(i + 1))
+            f.write('ended')
         
         print('\nExperiments ended.')
     else:

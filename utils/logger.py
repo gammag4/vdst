@@ -29,6 +29,12 @@ class Logger(ABC):
             
             self.log({'current_step': self.current_step})
     
+    def start(self):
+        pass
+    
+    def end(self):
+        pass
+    
     def log(self, vars: dict):
         if self.is_main_process:
             self.iteration_vars = {**self.iteration_vars, **vars}
@@ -103,14 +109,18 @@ class WandbLogger(PrintLogger):
     def __init__(self, logger_config, config, is_main_process):
         super().__init__(is_main_process)
         
-        group_msg = f' - {logger_config.run_group_name}' if logger_config.run_group_name is not None else ''
-        self.message(f'Starting run "{logger_config.project_name}{group_msg} - {logger_config.run_name}"\n')
+        self.logger_config = logger_config
+        self.config = config
+    
+    def start(self):
+        group_msg = f' - {self.logger_config.run_group_name}' if self.logger_config.run_group_name is not None else ''
+        self.message(f'Starting run "{self.logger_config.project_name}{group_msg} - {self.logger_config.run_name}"\n')
         
         wandb.init(
-            project=logger_config.project_name,
-            group=logger_config.run_group_name,
-            name=logger_config.run_name,
-            config=config
+            project=self.logger_config.project_name,
+            group=self.logger_config.run_group_name,
+            name=self.logger_config.run_name,
+            config=self.config
         )
     
     def _log_vars(self, vars):
@@ -118,6 +128,9 @@ class WandbLogger(PrintLogger):
     
     def log_image(self, path, name):
         wandb.log({name: wandb.Image(path, caption=name)}, step=self.current_step)
+    
+    def end(self):
+        wandb.finish()
 
 
 # TODO ???

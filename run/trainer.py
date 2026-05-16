@@ -295,7 +295,8 @@ class DistributedTrainer(ABC):
             
             self.logger.log({
                 'epoch': self.current_epoch,
-                'epoch_step': self.current_epoch_step
+                'epoch_step': self.current_epoch_step,
+                'total_steps': self.n_real_steps
             })
             
             self._run_pass(batch)

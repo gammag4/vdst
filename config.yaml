@@ -75,6 +75,7 @@ train:
   
   logger:
     project_name: VDST
+    run_group_name: null
     run_name: vdst
 
   checkpoints:

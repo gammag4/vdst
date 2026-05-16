@@ -77,7 +77,7 @@ class VDSTTrainer(DistributedTrainer):
         return (optimizer, lr_scheduler)
     
     def _create_logger(self):
-        return WandbLogger(self.config.train.logger.project_name, self.config.train.logger.run_name, self.config, self.rank == 0)
+        return WandbLogger(self.config.train.logger, self.config, self.rank == 0)
     
     def _init_training(self):
         train_dataset, val_dataset = self._create_datasets(self.config.train.data)

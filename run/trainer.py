@@ -311,8 +311,6 @@ class DistributedTrainer(ABC):
         pass
     
     async def run(self):
-        print(f'Starting run "{self.config.train.logger.project_name} - {self.config.train.logger.run_name}"\n')
-        
         training_args = self._init_training()
         
         self.train_data = self._create_dataloader(training_args.train_dataset, train_dataloader=True)

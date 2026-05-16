@@ -100,9 +100,18 @@ class StandardLogger(PrintLogger):
 
 
 class WandbLogger(PrintLogger):
-    def __init__(self, project_name, run_name, config, is_main_process):
+    def __init__(self, logger_config, config, is_main_process):
         super().__init__(is_main_process)
-        wandb.init(project=project_name, name=run_name, config={}) # TODO config
+        
+        group_msg = f' - {logger_config.run_group_name}' if logger_config.run_group_name is not None else ''
+        self.message(f'Starting run "{logger_config.project_name}{group_msg} - {logger_config.run_name}"\n')
+        
+        wandb.init(
+            project=logger_config.project_name,
+            group=logger_config.run_group_name,
+            name=logger_config.run_name,
+            config={}  # TODO config
+        )
     
     def _log_vars(self, vars):
         wandb.log(vars, step=self.current_step)

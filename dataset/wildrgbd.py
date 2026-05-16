@@ -41,8 +41,8 @@ class WildRGBDDataset(Dataset):
         
         with open(os.path.join(spath, 'cam_poses.txt'), 'r', encoding='utf8') as f:
             lines = f.read().strip().split('\n')
-            w2cs = [torch.linalg.inv(torch.tensor([float(i) for i in l.strip().split()[1:]]).reshape(4, 4)) for l in lines]
-            R, t = zip(*((w2c[:3, :3], w2c[:3, 3]) for w2c in w2cs))
+            c2ws = [torch.tensor([float(i) for i in l.strip().split()[1:]]).reshape(4, 4) for l in lines]
+            R, t = zip(*((c2w[:3, :3], c2w[:3, 3]) for c2w in c2ws))
         
         images, depths, R, t = zip(*self.random.sample(list(zip(images, depths, R, t)), self.n_sources + self.n_targets))
         images, depths = [[torch.from_numpy(np.array(PIL.Image.open(path))) for path in paths] for paths in (images, depths)]

@@ -20,15 +20,18 @@ def compute_pad(hw: tuple[int] | torch.Size, p: int):
 
 def compute_view_rays_from_vecs(vecs: torch.Tensor, K: torch.Tensor, R: torch.Tensor, t: torch.Tensor):
     # Computes view rays (o, d)
+    # R, T should be c2w transformations
     # vecs: meshgrid vecs, first dim is (x, y, z)
     # vecs: (3, h, w), K: (3, 3), R: (B, 3, 3), t: (B, 3)
 
     h, w = vecs.shape[-2:]
 
-    o = -einx.dot('... h w, ... h -> ... w', R, t)  # -R^T t
+    o = t  # c2w: t
+    # o = -einx.dot('... h w, ... h -> ... w', R, t)  # w2c: -R^T t
     o = o.view(o.shape + (1, 1)) # allows broadcasting over h w later
 
-    d = einx.dot('... x1 c2, ... x1 c, c h w -> ... c2 h w', R, K.inverse(), vecs)  # R^T K^-1 x_ij,cam
+    d = einx.dot('... c2 x1, ... x1 c, c h w -> ... c2 h w', R, K.inverse(), vecs)  # c2w: R K^-1 x_ij,cam + t - o = R K^-1 x_ij,cam
+    # d = einx.dot('... x1 c2, ... x1 c, c h w -> ... c2 h w', R, K.inverse(), vecs)  # w2c: R^T K^-1 x_ij,cam - R^T t - o = R^T K^-1 x_ij,cam
 
     d = d / einx.sum('... [c] h w -> ... 3 h w', d * d).sqrt()  # normalize d
 

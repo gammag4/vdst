@@ -42,6 +42,8 @@ setup:
 train:
   # How many train steps to run in each epoch
   n_steps: 500000
+  # For experiments
+  n_real_steps: null
   # Display logs every n steps
   display_log_steps_interval: 10
   # Do evaluation and save results after every n steps
@@ -136,7 +138,7 @@ model:
   has_input_depth_masks: true
 
   # Number of layers in transformer
-  n_layers: 24
+  n_layers: 6
   # Dimension of all the vector representations used in the transformer models (dim for all vector inputs in transformers, not just the embedding vectors that will be the latent representations of scenes, idk why did i put such a confusing name but yeah)
   d_model: 768
   # Dimension of vector representations in the attention space of transformer block (normally chosen to be equal to d_model)

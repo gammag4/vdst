@@ -73,15 +73,49 @@ def process_config(config):
 
     return config
 
+def parse_omega_config(config):
+    config = OmegaConf.to_container(config, resolve=True)
+    config = parse_config(config)
+    config = edict(config)
+
+    return config
+
 
 def load_config(path, cli_args):
     config = OmegaConf.load(path)
     extra_config = OmegaConf.from_cli(cli_args)
     config = OmegaConf.merge(config, extra_config)
-    config = OmegaConf.to_container(config, resolve=True)
-    config = parse_config(config)
-    config = edict(config)
-
+    config = parse_omega_config(config)
     config = process_config(config)
 
     return config
+
+
+def load_experiments_config(path, experiments_path, cli_args):
+    global_config = OmegaConf.load(path)
+    experiments_config = OmegaConf.load(experiments_path)
+    extra_config = OmegaConf.from_cli(cli_args)
+
+    extra_config = OmegaConf.merge(experiments_config['overrides'], extra_config)
+    global_config = OmegaConf.merge(global_config, extra_config)
+
+    setup_config = parse_omega_config(experiments_config['setup'])
+
+    experiments = []
+    for k, v in experiments_config['experiments'].items():
+        group_name = f'experiments_{k}'
+        for k2, v2 in v.items():
+            name = f'experiment_{k2}'
+
+            config = OmegaConf.merge(global_config, v2)
+            config = parse_omega_config(config)
+            config = process_config(config)
+
+            config.train.logger.run_group_name = group_name
+            config.train.logger.run_name = name
+            config.train.checkpoints.path = os.path.join(setup_config.out_path, group_name, name)
+            config.train.total_experiment_steps = setup_config.total_experiment_steps
+
+            experiments.append(config)
+
+    return experiments, setup_config

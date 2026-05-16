@@ -26,6 +26,7 @@ class DistributedTrainer(ABC):
         self.grad_scaler_enabled = config.setup.grad_scaler
         self.grad_clipping_config = config.train.grad_clipping
         self.n_steps = self.config.train.n_steps
+        self.n_real_steps = self.config.train.n_real_steps if self.config.train.n_real_steps else self.n_steps
         
         self.last_grad_norms = torch.tensor([], dtype=torch.float32)
         self.train_data = None
@@ -281,7 +282,7 @@ class DistributedTrainer(ABC):
         self.train_data.sampler.set_epoch(self.current_epoch)
         it = iter(self.train_data)
         
-        for _ in range(self.n_steps):
+        for _ in range(self.n_real_steps):
             try:
                 batch = next(it)
             except StopIteration:
@@ -338,7 +339,7 @@ class DistributedTrainer(ABC):
             enabled=self.amp_config.enabled and self.grad_scaler_enabled
         )
         
-        self.timer = Timer(self.n_steps)
+        self.timer = Timer(self.n_real_steps)
         
         # When using torchrun, we need load and save checkpoint logic because when any of the processes fail, torchrun restarts all of them at the last existing checkpoint
         # Starts from checkpoint if exists

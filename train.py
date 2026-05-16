@@ -3,25 +3,36 @@ import argparse
 from omegaconf import OmegaConf
 from dotenv import load_dotenv
 
-from utils.config import load_config
+from utils.config import load_config, load_experiments_config
 from run.runner import run_distributed
 from run.vdst_trainer import VDSTTrainer
+
+
+async def run_experiment(config):
+    assert 'cuda' in config.setup.distributed.device, 'non-CUDA devices not supported'
+    
+    trainer = VDSTTrainer(config)
+    await run_distributed(config, trainer.run)
 
 
 async def main():
     parser = argparse.ArgumentParser(description='Train the model')
     parser.add_argument('--config', help='Config file path', required=True)
+    parser.add_argument('--experiments', help='Experiments file path')
     parser.add_argument('other', nargs='*')
     args = parser.parse_args()
     
     load_dotenv()
     
-    config = load_config(args.config, args.other)
-
-    assert 'cuda' in config.setup.distributed.device, 'non-CUDA devices not supported'
-
-    trainer = VDSTTrainer(config)
-    await run_distributed(config, trainer.run)
+    if args.experiments:
+        print('Running multiple experiments...')
+        
+        experiments, setup_config = load_experiments_config(args.config, args.experiments, args.other)
+        for config in experiments:
+            await run_experiment(config)
+    else:
+        config = load_config(args.config, args.other)
+        await run_experiment(config)
 
 
 if __name__ == '__main__':

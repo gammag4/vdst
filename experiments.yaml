@@ -1,0 +1,42 @@
+overrides:
+  model:
+    has_input_depths: true
+    has_input_depth_masks: true
+    enc_layer_norm: false
+    enc_residual_layer_norm: false
+    dec_layer_norm: false
+    dec_residual_layer_norm: false
+    standardize_inputs: false
+  train:
+    val_steps_interval: 500
+    n_steps: 500000
+
+    loss:
+      scheduler: falling_perceptual
+      weights: [2.0,2.0,0.7,1.5,1.0]
+    optimizer:
+      lr: 4e-4
+      n_warmup_steps: 5000
+
+setup:
+  out_path: results/experiments/
+  total_experiment_steps: 20000
+
+experiments:
+  lr:
+    lr_1e-2_warmup_steps:
+      train:
+        optimizer:
+          lr: 1e-2
+    lr_1e-3_warmup_steps:
+      train:
+        optimizer:
+          lr: 1e-3
+    lr_1e-4_warmup_steps:
+      train:
+        optimizer:
+          lr: 1e-4
+    lr_1e-5_warmup_steps:
+      train:
+        optimizer:
+          lr: 1e-5

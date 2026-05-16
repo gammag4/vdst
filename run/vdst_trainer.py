@@ -27,7 +27,7 @@ class VDSTTrainer(DistributedTrainer):
         self.val_batch_size = self.config.train.data.val_batch_size
         self.val_split = 1 * self.val_batch_size # Picking n scenes for validation
         
-        if self.rank == 0:
+        if self.is_main_process:
             self.eval_metrics = EvalMetrics().to(self.device)
     
     def _create_datasets(self, config):
@@ -84,7 +84,7 @@ class VDSTTrainer(DistributedTrainer):
         return (optimizer, lr_scheduler)
     
     def _create_logger(self):
-        return WandbLogger(self.config.train.logger, self.config, self.rank == 0)
+        return WandbLogger(self.config.train.logger, self.config, self.is_main_process)
     
     def _init_training(self):
         train_dataset, val_dataset = self._create_datasets(self.config.train.data)

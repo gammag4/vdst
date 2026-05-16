@@ -39,6 +39,10 @@ class DistributedTrainer(ABC):
         self.timer = None
         self.current_epoch = 0
         self.current_epoch_step = 0
+    
+    @property
+    def is_main_process(self):
+        return self.rank == 0
 
     def _create_dataloader(self, dataset: Dataset, train_dataloader=True):
         config = self.config.train.data
@@ -126,7 +130,7 @@ class DistributedTrainer(ABC):
         current_step = self.logger.current_step - 1 # Runs after updating step
         
         # Ensures only saves from first GPU to prevent redundancy
-        if current_step == 0 or self.rank != 0 or current_step % self.config.train.checkpoints.checkpoint_steps_interval != 0:
+        if current_step == 0 or not self.is_main_process or current_step % self.config.train.checkpoints.checkpoint_steps_interval != 0:
             return
         
         torch.accelerator.synchronize(self.device)
@@ -257,7 +261,7 @@ class DistributedTrainer(ABC):
         if self.logger.current_step % self.config.train.val_steps_interval == 0:
             self._val()
         
-        if self.rank == 0 and self.logger.current_step % self.config.train.display_log_steps_interval == 0:
+        if self.is_main_process and self.logger.current_step % self.config.train.display_log_steps_interval == 0:
             torch.accelerator.synchronize(self.device)
             self.logger.display_current()
             print('')
@@ -290,7 +294,6 @@ class DistributedTrainer(ABC):
             
             self._run_pass(batch)
     
-    # Should check and only save stuff at rank 0
     @abstractmethod
     def _run_eval(self, data_iter):
         pass
@@ -301,7 +304,7 @@ class DistributedTrainer(ABC):
         self.val_data.sampler.set_epoch(0)
 
         with amp.autocast(device_type=self.device, dtype=self.amp_config.dtype, enabled=self.amp_config.enabled), torch.no_grad():
-            if self.rank == 0:
+            if self.is_main_process:
                 self._run_eval(iter(self.val_data))
         
         self.model.train()
@@ -337,7 +340,7 @@ class DistributedTrainer(ABC):
         # Starts from checkpoint if exists
         self._try_load_checkpoint()
         
-        if self.rank == 0:
+        if self.is_main_process:
             print_model_stats(self.model, print_all_named_params=False)
         
         return self._train()

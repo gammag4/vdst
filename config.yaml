@@ -95,19 +95,16 @@ train:
     shuffle: true
     pin_memory: false
     train_batch_size: 4
-    val_batch_size: 8
+    val_batch_size: 4
 
     n_sources: 2
-    n_targets: 8
+    n_targets: 6
     output_dims: [256, 256]
 
     # Datasets
     datasets:
       wildrgbd:
         path: ./datasets/wildrgbd/
-        # n_sources: 2
-        # n_targets: 6
-        # resize_to: [256, 256] # TODO
 
   loss:
     # image_mse, image_perceptual, depth_silog, depth_multiscale, depth_perceptual
@@ -155,11 +152,11 @@ model:
   # Operation used for attention, should be from xops.fmha
   attn_op: [(obj), xformers.ops.fmha.MemoryEfficientAttentionFlashAttentionOp]
   # Enable/disable layer norm in enc layers
-  enc_layer_norm: true # TODO check with it
-  enc_residual_layer_norm: true # TODO check with it
+  enc_layer_norm: false # TODO check with it
+  enc_residual_layer_norm: false # TODO check with it
   # Enable/disable layer norm in dec layers
-  dec_layer_norm: true # TODO check with it
-  dec_residual_layer_norm: true # TODO check with it
+  dec_layer_norm: false # TODO check with it
+  dec_residual_layer_norm: false # TODO check with it
   # Whether to normalize images and depths to mean 0 std 1 before inputting to the network and denormalize after output
   standardize_inputs: false # TODO check with it
   # Enable/disable activation checkpointing

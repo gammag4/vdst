@@ -41,6 +41,10 @@ class DistributedTrainer(ABC):
         self.current_epoch_step = 0
     
     @property
+    def is_last(self):
+        return self.logger.current_step == self.n_real_steps
+    
+    @property
     def is_main_process(self):
         return self.rank == 0
 
@@ -130,7 +134,7 @@ class DistributedTrainer(ABC):
         current_step = self.logger.current_step - 1 # Runs after updating step
         
         # Ensures only saves from first GPU to prevent redundancy
-        if current_step == 0 or not self.is_main_process or current_step % self.config.train.checkpoints.checkpoint_steps_interval != 0:
+        if not self.is_last and (current_step == 0 or not self.is_main_process or current_step % self.config.train.checkpoints.checkpoint_steps_interval != 0):
             return
         
         torch.accelerator.synchronize(self.device)
@@ -258,7 +262,7 @@ class DistributedTrainer(ABC):
         
         self._step()
 
-        if self.logger.current_step % self.config.train.val_steps_interval == 0:
+        if self.is_last or self.logger.current_step % self.config.train.val_steps_interval == 0:
             self._val()
         
         if self.is_main_process and self.logger.current_step % self.config.train.display_log_steps_interval == 0:

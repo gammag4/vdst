@@ -8,10 +8,10 @@ from run.runner import run_distributed
 from run.vdst_trainer import VDSTTrainer
 
 
-async def run_experiment(config):
+async def run_experiment(config, config_raw):
     assert 'cuda' in config.setup.distributed.device, 'non-CUDA devices not supported'
     
-    trainer = VDSTTrainer(config)
+    trainer = VDSTTrainer(config, config_raw)
     await run_distributed(config, trainer.run)
 
 
@@ -28,11 +28,11 @@ async def main():
         print('Running multiple experiments...')
         
         experiments, setup_config = load_experiments_config(args.config, args.experiments, args.other)
-        for config in experiments:
-            await run_experiment(config)
+        for config, config_raw in experiments:
+            await run_experiment(config, config_raw)
     else:
-        config = load_config(args.config, args.other)
-        await run_experiment(config)
+        config, config_raw = load_config(args.config, args.other)
+        await run_experiment(config, config_raw)
 
 
 if __name__ == '__main__':

@@ -1,10 +1,10 @@
 import os
 import importlib
-
 from omegaconf import OmegaConf
 from easydict import EasyDict as edict
-
 import torch
+
+from .other import edict_to_dict
 
 
 def import_object(full_name):
@@ -86,9 +86,10 @@ def load_config(path, cli_args):
     extra_config = OmegaConf.from_cli(cli_args)
     config = OmegaConf.merge(config, extra_config)
     config = parse_omega_config(config)
+    config_raw = edict_to_dict(config)
     config = process_config(config)
 
-    return config
+    return config, config_raw
 
 
 def load_experiments_config(path, experiments_path, cli_args):
@@ -109,13 +110,15 @@ def load_experiments_config(path, experiments_path, cli_args):
 
             config = OmegaConf.merge(global_config, v2)
             config = parse_omega_config(config)
-            config = process_config(config)
 
             config.train.logger.run_group_name = group_name
             config.train.logger.run_name = name
             config.train.checkpoints.path = os.path.join(setup_config.out_path, group_name, name)
             config.train.total_experiment_steps = setup_config.total_experiment_steps
 
-            experiments.append(config)
+            config_raw = edict_to_dict(config)
+            config = process_config(config)
+
+            experiments.append((config, config_raw))
 
     return experiments, setup_config

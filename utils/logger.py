@@ -110,7 +110,7 @@ class WandbLogger(PrintLogger):
             project=logger_config.project_name,
             group=logger_config.run_group_name,
             name=logger_config.run_name,
-            config={}  # TODO config
+            config=config
         )
     
     def _log_vars(self, vars):

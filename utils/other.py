@@ -6,6 +6,8 @@ from .io import try_run_cmd
 def edict_to_dict(ed):
     if isinstance(ed, dict):
         return {k: edict_to_dict(v) for k, v in ed.items()}
+    elif isinstance(ed, tuple):
+        return tuple(edict_to_dict(v) for v in ed)
     elif isinstance(ed, list):
         return [edict_to_dict(v) for v in ed]
     else:

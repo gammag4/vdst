@@ -16,8 +16,9 @@ from utils.timer import Timer
 
 
 class DistributedTrainer(ABC):
-    def __init__(self, config):
+    def __init__(self, config, config_raw):
         self.config = config
+        self.config_raw = config_raw
 
         self.device = config.setup.distributed.device
         self.local_rank = config.setup.distributed.local_rank

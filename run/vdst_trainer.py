@@ -21,8 +21,8 @@ from dataset.wildrgbd import WildRGBDDataset
 
 
 class VDSTTrainer(DistributedTrainer):
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self, config, config_raw):
+        super().__init__(config, config_raw)
         
         self.val_batch_size = self.config.train.data.val_batch_size
         self.val_split = 1 * self.val_batch_size # Picking n scenes for validation
@@ -84,7 +84,7 @@ class VDSTTrainer(DistributedTrainer):
         return (optimizer, lr_scheduler)
     
     def _create_logger(self):
-        return WandbLogger(self.config.train.logger, self.config, self.is_main_process)
+        return WandbLogger(self.config.train.logger, self.config_raw, self.is_main_process)
     
     def _init_training(self):
         train_dataset, val_dataset = self._create_datasets(self.config.train.data)

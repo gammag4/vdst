@@ -12,11 +12,12 @@ overrides:
     n_steps: 500000
 
     loss:
-      scheduler: falling_perceptual
       weights: [2.0,2.0,0.7,1.5,1.0]
+      perceptual:
+        scheduler: constant
     optimizer:
       lr: 4e-4
-      n_warmup_steps: 5000
+      n_warmup_steps: 3000
 
 setup:
   out_path: results/experiments/
@@ -24,19 +25,20 @@ setup:
 
 experiments:
   lr:
-    lr_1e-2_warmup_steps:
+    lr_2e-3_5k_warmup:
       train:
         optimizer:
-          lr: 1e-2
-    lr_1e-3_warmup_steps:
+          lr: 2e-3
+          n_warmup_steps: 5000
+    lr_1e-3:
       train:
         optimizer:
           lr: 1e-3
-    lr_1e-4_warmup_steps:
+    lr_1e-4:
       train:
         optimizer:
           lr: 1e-4
-    lr_1e-5_warmup_steps:
+    lr_1e-5:
       train:
         optimizer:
           lr: 1e-5

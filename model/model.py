@@ -12,7 +12,7 @@ class VDST(nn.Module):
     # not specified: H, W, C, N_{context}
     # n_heads should divide d_model
     # p should divide H and W (padding, cropping and resizing)
-    def __init__(self, config, loss):
+    def __init__(self, config, loss=None):
         super().__init__()
         
         self.config = config
@@ -93,7 +93,7 @@ class VDST(nn.Module):
     # Shape: (B, F, C, H, W)
     def forward(self, scene):
         sources, targets = scene.sources, scene.targets
-        targets_hw = targets.images.shape[-2:]
+        targets_hw = (targets.images if targets.images else sources.images).shape[-2:]
         sources_images, sources_depths, normalization_factors = self.normalize_sources(sources.images, sources.depths)
         sources = edict(
             K=sources.K,
@@ -154,8 +154,7 @@ class VDST(nn.Module):
             # depth_masks=gen_depth_masks # TODO maybe gen this
         )
         
-        evaluate_targets = True # TODO check if eval mode or loss is none
-        loss = self.loss(gen_targets, targets) if evaluate_targets else None
+        loss = self.loss(gen_targets, targets) if self.loss is not None else None
         
         return edict(
             scene_name=scene.scene_name,

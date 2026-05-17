@@ -1,7 +1,6 @@
 import os
 import asyncio
 import argparse
-from omegaconf import OmegaConf
 from dotenv import load_dotenv
 
 from utils.config import load_config, load_experiments_config

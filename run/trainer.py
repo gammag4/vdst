@@ -189,7 +189,7 @@ class DistributedTrainer(ABC):
         elif clipped:
             self.logger.message(f'Clipped norm: {grad_norm:.4f} > {grad_clip_norm:.4f} ({grad_norm_mean:.4f} + {grad_clip_norm - grad_norm_mean:.4f})')
         
-        self.logger.log({'grad': {
+        self.logger.log({'metrics/grad': {
             'norm': grad_norm,
             'norm_mean': grad_norm_mean,
             'norm_std': grad_norm_std,
@@ -237,13 +237,13 @@ class DistributedTrainer(ABC):
         # Updates the scale for next iteration
         self.grad_scaler.update()
 
-        self.logger.log({'loss': loss.detach().item()})
+        self.logger.log({'metrics/loss': loss.detach().item()})
 
     # This method is run after each pass to update stuff
     def _step(self):
         self.timer.update()
         
-        self.logger.log({'time': {
+        self.logger.log({'info/time': {
             'total': self.timer.total,
             'delta': self.timer.delta,
             'avg_delta': self.timer.avg_delta,
@@ -295,11 +295,12 @@ class DistributedTrainer(ABC):
                 self.current_epoch_step = 0
                 self.train_data.sampler.set_epoch(self.current_epoch)
             
-            self.logger.log({
+            self.logger.log({'info/step': {
+                'step': self.logger.current_step, # TODO refactor
                 'epoch': self.current_epoch,
                 'epoch_step': self.current_epoch_step,
                 'total_steps': self.n_real_steps
-            })
+            }})
             
             self._run_pass(batch)
         

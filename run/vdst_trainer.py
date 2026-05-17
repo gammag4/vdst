@@ -176,7 +176,7 @@ class VDSTTrainer(DistributedTrainer):
         
         eval_metrics.num_images = sum([e.num_images for e in eval_metricss])
         
-        self.logger.log({'eval_metrics': eval_metrics})
+        self.logger.log({'metrics/eval': eval_metrics})
         
         with open(os.path.join(path, 'eval_metrics.yaml'), 'w', encoding='utf8') as f:
             yaml.dump(edict_to_dict(eval_metrics), f, default_flow_style=False, sort_keys=True)
@@ -187,13 +187,15 @@ class VDSTTrainer(DistributedTrainer):
         res = self.model(batch)
         
         self.logger.log({
-            'scene_names': batch.scene_name,
-            'optimizer_lrs': {f'{i}': p['lr'] for i, p in enumerate(self.optimizer.param_groups)},
-            'loss_weights': {f'{i}': w for i, w in enumerate(res.loss.loss_weights.detach().tolist())},
-            'raw_losses': {f'{i}': w for i, w in enumerate(res.loss.raw_losses.detach().tolist())},
-            'weighted_losses': {f'{i}': w for i, w in enumerate(res.loss.weighted_losses.detach().tolist())},
-            'weighted_image_perceptual_losses': {f'{i}': w for i, w in enumerate(res.loss.weighted_image_perceptual_losses.detach().tolist())},
-            'weighted_depth_perceptual_losses': {f'{i}': w for i, w in enumerate(res.loss.weighted_depth_perceptual_losses.detach().tolist())}
+            'info/scene_names': batch.scene_name,
+            'info/optimizer_lrs': {f'{i}': p['lr'] for i, p in enumerate(self.optimizer.param_groups)},
+            'info/loss_weights': {f'{i}': w for i, w in enumerate(res.loss.loss_weights.detach().tolist())},
+            'metrics/raw_losses': {f'{i}': w for i, w in enumerate(res.loss.raw_losses.detach().tolist())},
+            'metrics/weighted_losses': {f'{i}': w for i, w in enumerate(res.loss.weighted_losses.detach().tolist())},
+            'perceptual_metrics/weighted_perceptual_losses': {
+                'image': {f'{i}': w for i, w in enumerate(res.loss.weighted_image_perceptual_losses.detach().tolist())},
+                'depth': {f'{i}': w for i, w in enumerate(res.loss.weighted_depth_perceptual_losses.detach().tolist())}
+            }
         })
         
         return res.loss.loss

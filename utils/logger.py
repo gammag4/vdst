@@ -9,8 +9,6 @@ class Logger(ABC):
         self.current_step = 0
         self.iteration_vars = {}
         self.global_vars = {}
-        
-        self.log({'current_step': self.current_step})
     
     @property
     def vars(self):
@@ -26,8 +24,6 @@ class Logger(ABC):
             self._log_vars(self.vars)
             self.iteration_vars = {}
             self.current_step += 1
-            
-            self.log({'current_step': self.current_step})
     
     def start(self):
         pass
@@ -131,18 +127,3 @@ class WandbLogger(PrintLogger):
     
     def end(self):
         wandb.finish()
-
-
-# TODO ???
-class Stateful(ABC):
-    @abstractmethod
-    def load_default_state(self):
-        pass
-    
-    @abstractmethod
-    def state_dict(self) -> dict:
-        pass
-    
-    @abstractmethod
-    def load_state_dict(self, state: dict):
-        pass

@@ -71,10 +71,9 @@ class EvalMetrics(nn.Module):
         ldms = ldm ** 2
         depths_silog_raw = ldsm - ldms
         depths_silog = 100.0 * depths_silog_raw.sqrt()
-        # TODO remove if this is not useful
-        # If this metric is rising, that means that the absolute component is not falling as fast as it should
-        # The ratio at which it rises tells how much it should be weighted in relation to the raw loss (variance)
-        depths_silog_absolute_ratio = ldms / depths_silog_raw
+        # SNR = mean^2 / std^2
+        depths_snr = ldms / depths_silog_raw
+        depths_sqrt_snr = depths_snr.sqrt()
         
         depths_log_10 = depths.log10()
         depths_gt_log_10 = depths_gt.log10()
@@ -99,7 +98,8 @@ class EvalMetrics(nn.Module):
             delta_1_25_3=depths_delta_1_25_3,
             
             silog=depths_silog,
-            silog_absolute_ratio=depths_silog_absolute_ratio,
+            snr=depths_snr,
+            sqrt_snr=depths_sqrt_snr,
             mean_log10=depths_mean_log10
         )
         

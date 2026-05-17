@@ -114,31 +114,47 @@ class VDSTTrainer(DistributedTrainer):
             logger=logger,
         )
     
+    def _try_fit_power_law(self):
+        pl_config = self.config.train.metric_power_law_fitting
+
+        if pl_config.should_fit and ((self.is_last and -1 in pl_config.instants) or self.logger.current_iter in pl_config.instants):
+            start_step = self.config.train.optimizer.n_warmup_steps if pl_config.skip_warmup_steps else 0
+            points = []  # TODO
+            points = points[start_step:]
+            # Does not fit if there is too little data
+            if len(points) >= 10:
+                # TODO fit power law
+                pass
+    
+    def _after_step(self):
+        self._try_fit_power_law()
+    
     def _save_intermediate_results(self, path, batch_index, batch_res):
         source_images, source_depths = batch_res.sources.images, batch_res.sources.depths
         target_gen_images, target_gen_depths = batch_res.gen_targets.images, batch_res.gen_targets.depths
         target_gt_images, target_gt_depths = batch_res.targets.images, batch_res.targets.depths
         
-        source_images, source_depths = [einx.rearrange('b v c h w -> (b h) (v w) c', t) for t in (source_images, source_depths)]
+        source_images, source_depths = [einx.rearrange('b v c h w -> b v h w c', t) for t in (source_images, source_depths)]
         
         target_images, target_depths = [torch.stack(tp, dim=0) for tp in [[target_gen_images, target_gt_images], [target_gen_depths, target_gt_depths]]]
-        target_images, target_depths = [einx.rearrange('l b v c h w -> (b h) (v l w) c', t) for t in (target_images, target_depths)]
+        target_images, target_depths = [einx.rearrange('l b v c h w -> l b v h w c', t) for t in (target_images, target_depths)]
         
-        source_images, target_images = [t.detach().cpu().numpy() for t in (source_images, target_images)]
+        source_images, target_images = [t.detach().cpu() for t in (source_images, target_images)]
         
         cmap = plt.get_cmap('jet')
+        source_depths, target_depths = [(einx.rearrange('... h w c -> (... h) (w c)', t), t.shape) for t in (source_depths, target_depths)]
+        source_depths, target_depths = [torch.from_numpy(cmap(((t - t.min()) / (t.max() - t.min())).detach().cpu().numpy())).reshape(shape) for t, shape in (source_depths, target_depths)]
         source_depths, target_depths = [einx.rearrange('h w c -> h (w c)', t) for t in (source_depths, target_depths)]
-        source_depths, target_depths = [cmap(((t - t.min()) / (t.max() - t.min())).detach().cpu().numpy()) for t in (source_depths, target_depths)]
         
-        source_images, target_images, source_depths, target_depths = [PIL.Image.fromarray((t * 255.0).astype(np.uint8)) for t in (source_images, target_images, source_depths, target_depths)]
+        sources = einx.rearrange('b1 v c h w, b2 v c h w -> ((b1 + b2) h) (v w) c', source_images, source_depths)
+        targets = einx.rearrange('l b1 v c h w, l b2 v c h w -> ((b1 + b2) h) (v l w) c', target_images, target_depths)
         
         is_val_str = 'val' if batch_index < self.val_split // self.val_batch_size else 'train'
         for img, name in [
-            (source_images, f'source_images_{batch_index}_{is_val_str}'),
-            (source_depths, f'source_depths_{batch_index}_{is_val_str}'),
-            (target_images, f'target_images_{batch_index}_{is_val_str}'),
-            (target_depths, f'target_depths_{batch_index}_{is_val_str}')
+            (sources, f'sources_{batch_index}_{is_val_str}'),
+            (targets, f'targets_{batch_index}_{is_val_str}')
         ]:
+            img = PIL.Image.fromarray((img.numpy() * 255.0).astype(np.uint8))
             img_path = os.path.join(path, f'{name}.png')
             img.save(img_path)
             self.logger.log_image(img_path, name)
@@ -157,7 +173,7 @@ class VDSTTrainer(DistributedTrainer):
         for i, batch in enumerate(data_iter):
             batch_res = self.model(batch)
             
-            if self.is_last or self.val_intermediate_results_steps % 10 == 0: # only saves results every 1/10th of the time
+            if self.is_last or self.val_intermediate_results_steps % 10 == 0: # only saves results every 1/10th of the time # TODO refactor
                 self._save_intermediate_results(path, i, batch_res)
                 self.val_intermediate_results_steps = 0
             self.val_intermediate_results_steps += 1

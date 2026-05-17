@@ -257,6 +257,26 @@ class DistributedTrainer(ABC):
         
         if self.lr_scheduler is not None:
             self.lr_scheduler.step()
+
+    # Eval step
+    @abstractmethod
+    def _run_eval(self, data_iter):
+        pass
+
+    def _val(self):
+        self.model.eval()
+
+        self.val_data.sampler.set_epoch(0)
+
+        with amp.autocast(device_type=self.device, dtype=self.amp_config.dtype, enabled=self.amp_config.enabled), torch.no_grad():
+            if self.is_main_process:
+                self._run_eval(iter(self.val_data))
+
+        self.model.train()
+
+    # Stuff to run after step
+    def _after_step(self):
+        pass
     
     # Use this method to run one forward/backward pass for a generic model
     def _run_pass(self, batch):
@@ -266,6 +286,8 @@ class DistributedTrainer(ABC):
 
         if self.is_last or self.logger.current_step % self.config.train.val_steps_interval == 0:
             self._val()
+
+        self._after_step()
         
         if self.is_main_process and self.logger.current_step % self.config.train.display_log_steps_interval == 0:
             torch.accelerator.synchronize(self.device)
@@ -307,21 +329,6 @@ class DistributedTrainer(ABC):
         self.logger.end()
     
     @abstractmethod
-    def _run_eval(self, data_iter):
-        pass
-    
-    def _val(self):
-        self.model.eval()
-        
-        self.val_data.sampler.set_epoch(0)
-
-        with amp.autocast(device_type=self.device, dtype=self.amp_config.dtype, enabled=self.amp_config.enabled), torch.no_grad():
-            if self.is_main_process:
-                self._run_eval(iter(self.val_data))
-        
-        self.model.train()
-    
-    @abstractmethod
     def _init_training(self):
         pass
     
@@ -353,6 +360,7 @@ class DistributedTrainer(ABC):
         self._try_load_checkpoint()
         
         if self.is_main_process:
+            # TODO log to wandb
             print_model_stats(self.model, print_all_named_params=False)
         
         return self._train()

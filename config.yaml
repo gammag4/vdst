@@ -49,6 +49,16 @@ train:
   # Do evaluation and save results after every n steps
   val_steps_interval: 100
 
+  # Power law fitting settings
+  metric_power_law_fitting:
+    # Whether to fit power laws at specified steps
+    should_fit: true
+    # At which steps to fit power laws to the metrics
+    # -1 means last instant
+    instants: [5000, 10000, 20000, 50000, 100000, 200000, 500000, -1]
+    # Whether to only fit the power laws after the warmup steps
+    skip_warmup_steps: true
+
   optimizer:
     # Number of warmup steps before going to cosine learning rate
     n_warmup_steps: 3000

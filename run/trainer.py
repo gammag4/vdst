@@ -44,7 +44,7 @@ class DistributedTrainer(ABC):
     
     @property
     def is_last(self):
-        return self.logger.current_step == self.n_real_steps
+        return self.logger.current_step == self.n_real_steps - 1
     
     @property
     def is_main_process(self):

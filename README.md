@@ -16,8 +16,16 @@ It is an RGB-D Novel View Synthesis model, where given a set of images and depth
 the model aims to generate a new view/depth in the scene, given the camera properties and pose of the target view.
 
 We propose VDST to investigate the capability of Transformer-based models in solving the task of RGB-D Novel View Synthesis.
-It is based primarily on the architecture of [LVSM](https://haian-jin.github.io/projects/LVSM/) and, just like it,
-is also generalizable to novel scenes and also follows its philosophy of minimizing inductive bias.
+This type of Transformer-based architecture for Novel View Synthesis is not new and was not originally proposed by us.
+In our case, we based it primarily on the architecture of [LVSM](https://haian-jin.github.io/projects/LVSM/) and its philosophy,
+though there are other similar architectures as well, with [SRT](https://srt-paper.github.io/) being another relevant example.
+
+This model has two main advantages in comparison to other methods:
+
+- Due to the generalization ability of Transformer-based models across domains, it is capable of generalizing to novel scenes that follow a similar distribution to the original training data;
+- Following the same philosophy as LVSM, our architecture also tries to minimize the inductive bias of the model,
+  and we hypothesize that this allows it to achieve better results than other methods when trained for longer periods with sufficiently large amounts of data,
+  although we do not have enough computational resources to verify this, leaving it for future work.
 
 ## Training
 

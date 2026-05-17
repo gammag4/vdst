@@ -16,8 +16,16 @@ Este é um modelo de RGB-D Novel View Synthesis, onde dadas um conjunto de visõ
 o modelo busca gerar uma nova visão com respectivo mapa de distância na cena, dadas as propriedades e pose da visão que se deseja gerar.
 
 Nós propomos VDST para investigar a capacidade de modelos baseados em Transformer de resolver o problema de RGB-D Novel View Synthesis.
-Ele é baseado primariamente na arquitetura do [LVSM](https://haian-jin.github.io/projects/LVSM/) e, assim como este,
-também é generalizável para cenas novas e também segue a sua mesma filosofia de minimizar o viés indutivo.
+Esse tipo de arquitetura baseada em Transformer para Novel View Synthesis não é nova e não foi originalmente proposta por nós.
+No nosso caso, nós nos baseamos principalmente na arquitetura do [LVSM](https://haian-jin.github.io/projects/LVSM/) e em sua filosofia,
+embora existam outras arquiteturas similares também, sendo [SRT](https://srt-paper.github.io/) outro exemplo relevante.
+
+Esse modelo possui duas vantagens principais em comparação com outros métodos:
+
+- Devido à capacidade de generalização entre domínios de modelos baseados em Transformer, ele é capaz de generalizar para cenas novas que seguem uma distribuição similar à dos dados originais de treino;
+- Seguindo a mesma filosofia do LVSM, nossa arquitetura também tenta minimizar o viés indutivo do modelo,
+  e hipotetizamos que isso permite alcançar melhor resultados do que outros métodos quando treinado por períodos mais longos com quantidades suficientemente grandes de dados,
+  apesar de não termos recursos computacionais suficientes para verificar isso, deixando tal investigação como trabalho futuro.
 
 ## Treinamento
 

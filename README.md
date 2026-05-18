@@ -37,3 +37,8 @@ conda activate vdst
 pip install -r requirements.txt
 torchrun --standalone --nproc-per-node=gpu train.py --config config.yaml
 ```
+
+## Rendering
+
+We also made a renderer that you can use to navigate on the scenes using this model, you can check it out [here](https://github.com/gammag4/nvs_renderer).
+

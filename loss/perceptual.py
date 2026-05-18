@@ -33,14 +33,14 @@ class PerceptualLoss(nn.Module):
         # return ((x1 - x2) ** 2).mean(dim=-1) # norm / C * H * W
     
     def forward_layer(self, x1, x2, dist_fn=torch.abs):
-        x1, x2 = [einx.rearrange('... c h w -> ... (c h w)', k) for k in (x1, x2)]
+        x1, x2 = [einx.id('... c h w -> ... (c h w)', k) for k in (x1, x2)]
         
         return self.distance(x1, x2, dist_fn=dist_fn)
     
     def forward(self, input, target, use_raw_distance=True):
         losses = []
         
-        input, target = [einx.rearrange('... c h w -> (...) c h w', k) for k in (input, target)]
+        input, target = [einx.id('... c h w -> (...) c h w', k) for k in (input, target)]
 
         x1, x2 = input, target
         if use_raw_distance:

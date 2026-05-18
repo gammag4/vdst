@@ -134,20 +134,20 @@ class VDSTTrainer(DistributedTrainer):
         target_gen_images, target_gen_depths = batch_res.gen_targets.images, batch_res.gen_targets.depths
         target_gt_images, target_gt_depths = batch_res.targets.images, batch_res.targets.depths
         
-        source_images, source_depths = [einx.rearrange('b v c h w -> b v h w c', t) for t in (source_images, source_depths)]
+        source_images, source_depths = [einx.id('b v c h w -> b v h w c', t) for t in (source_images, source_depths)]
         
         target_images, target_depths = [torch.stack(tp, dim=0) for tp in [[target_gen_images, target_gt_images], [target_gen_depths, target_gt_depths]]]
-        target_images, target_depths = [einx.rearrange('l b v c h w -> l b v h w c', t) for t in (target_images, target_depths)]
+        target_images, target_depths = [einx.id('l b v c h w -> l b v h w c', t) for t in (target_images, target_depths)]
         
         source_images, target_images = [t.detach().cpu() for t in (source_images, target_images)]
         
         cmap = plt.get_cmap('jet')
-        source_depths, target_depths = [(einx.rearrange('... h w c -> (... h) (w c)', t), t.shape) for t in (source_depths, target_depths)]
+        source_depths, target_depths = [(einx.id('... h w c -> (... h) (w c)', t), t.shape) for t in (source_depths, target_depths)]
         source_depths, target_depths = [torch.from_numpy(cmap(((t - t.min()) / (t.max() - t.min())).detach().cpu().numpy())).reshape(shape) for t, shape in (source_depths, target_depths)]
-        source_depths, target_depths = [einx.rearrange('h w c -> h (w c)', t) for t in (source_depths, target_depths)]
+        source_depths, target_depths = [einx.id('h w c -> h (w c)', t) for t in (source_depths, target_depths)]
         
-        sources = einx.rearrange('b1 v c h w, b2 v c h w -> ((b1 + b2) h) (v w) c', source_images, source_depths)
-        targets = einx.rearrange('l b1 v c h w, l b2 v c h w -> ((b1 + b2) h) (v l w) c', target_images, target_depths)
+        sources = einx.id('b1 v c h w, b2 v c h w -> ((b1 + b2) h) (v w) c', source_images, source_depths)
+        targets = einx.id('l b1 v c h w, l b2 v c h w -> ((b1 + b2) h) (v l w) c', target_images, target_depths)
         
         is_val_str = 'val' if batch_index < self.val_split // self.val_batch_size else 'train'
         for img, name in [

@@ -73,7 +73,7 @@ class SelfAttn(nn.Module):
     
     def forward(self, X: torch.Tensor, attn_bias: torch.Tensor | xops.AttentionBias | None = None):
         Q, K, V = self.W_Q(X), self.W_K(X), self.W_V(X)
-        Q, K, V = [einx.rearrange('b m (h d) -> b m h d', i, h=self.n_heads) for i in (Q, K, V)]
+        Q, K, V = [einx.id('b m (h d) -> b m h d', i, h=self.n_heads) for i in (Q, K, V)]
         
         # QK-Norm
         if self.use_qk_norm:
@@ -81,7 +81,7 @@ class SelfAttn(nn.Module):
         
         X = self.fmha(Q, K, V, attn_bias=attn_bias)
         
-        X = einx.rearrange('b m h d -> b m (h d)', X)
+        X = einx.id('b m h d -> b m (h d)', X)
         X = self.W_O(X)
         
         return X
@@ -118,7 +118,7 @@ class Encoder(nn.Module):
         # X: (...B, n_tokens, d_model)
         # Returns same shape
         orig_shape = X.shape
-        X = einx.rearrange('... n d -> (...) n d', X)
+        X = einx.id('... n d -> (...) n d', X)
         
         if self.use_activation_checkpointing:
             process_block = lambda block, X, attn_bias: checkpoint(block, X, attn_bias, use_reentrant=False)

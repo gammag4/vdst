@@ -163,7 +163,7 @@ class PoseEncoder(nn.Module):
 
         # Concatenating image with rays and rearranging into embeddings
         # (B, HW/p^2, (6 + C) * p^2)
-        embeds = einx.rearrange(
+        embeds = einx.id(
             # Full exp: '... c0 (h p1) (w p2), ... c1 (h p1) (w p2), ... c2 (h p1) (w p2), ... c3 (h p1) (w p2) -> ... (h w) ((c0 + c1 + c2 + c3) p1 p2)',
             exp,
             *exp_inputs,

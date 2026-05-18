@@ -52,7 +52,7 @@ class Loss(nn.Module):
         # TODO maybe use network trained specifically for depth
         rlog, tlog = depths_log, depths_gt_log
         rlog, tlog = [(t - tlog.mean()) / tlog.std() for t in (rlog, tlog)]
-        rlog, tlog = [einx.rearrange('... c2 h w -> (... c2) c h w', t, c=3) for t in (rlog, tlog)]
+        rlog, tlog = [einx.id('... c2 h w -> (... c2) c h w', t, c=3) for t in (rlog, tlog)]
         depth_perceptual_loss, weighted_depth_perceptual_losses = self.perceptual(rlog, tlog, use_raw_distance=False)
         
         # TODO add SSI error

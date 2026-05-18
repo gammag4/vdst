@@ -115,7 +115,7 @@ class VDST(nn.Module):
         targets_hw_padded = targets_hw[0] + pad[2] + pad[3], targets_hw[1] + pad[0] + pad[1]
 
         orig_query_shape = query_embeds.shape
-        source_embeds, query_embeds = [einx.rearrange('... v n d -> (...) (v n) d', t) for t in (source_embeds, query_embeds)]
+        source_embeds, query_embeds = [einx.id('... v n d -> (...) (v n) d', t) for t in (source_embeds, query_embeds)]
         in_embeds = torch.concat([source_embeds, query_embeds], dim=-2)
         out_embeds = self.transformer(in_embeds)
         out_embeds = out_embeds[..., -query_embeds.shape[-2]:, :]
@@ -130,7 +130,7 @@ class VDST(nn.Module):
         out_image_embeds, out_depth_embeds = self.image_decoder_linear(norm_out_img_embeds), self.depth_decoder_linear(norm_out_depth_embeds)
         
         out_images_padded, out_depths_padded = [
-            einx.rearrange(
+            einx.id(
                 '... (h w) (c p1 p2) -> ... c (h p1) (w p2)',
                 t,
                 h=targets_hw_padded[0] // self.config.p,

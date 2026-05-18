@@ -47,8 +47,8 @@ class WildRGBDDataset(Dataset):
         images, depths, R, t = zip(*self.random.sample(list(zip(images, depths, R, t)), self.n_sources + self.n_targets))
         images, depths = [[torch.from_numpy(np.array(PIL.Image.open(path))) for path in paths] for paths in (images, depths)]
         
-        images = [einx.rearrange('h w c -> c h w', image).float() / 255.0 for image in images]
-        depths = [einx.rearrange('h w -> 1 h w', depth).int() for depth in depths]
+        images = [einx.id('h w c -> c h w', image).float() / 255.0 for image in images]
+        depths = [einx.id('h w -> 1 h w', depth).int() for depth in depths]
         
         images = [
             VF.resize(
@@ -76,7 +76,7 @@ class WildRGBDDataset(Dataset):
         
         sources, targets = [
             edict(
-                K=einx.rearrange('m n -> b m n', K, b=t[s:e].shape[0]),
+                K=einx.id('m n -> b m n', K, b=t[s:e].shape[0]),
                 R=R[s:e],
                 t=t[s:e],
                 images=images[s:e],

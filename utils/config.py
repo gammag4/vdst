@@ -104,9 +104,9 @@ def load_experiments_config(path, experiments_path, cli_args):
 
     experiments = []
     for k, v in experiments_config['experiments'].items():
-        group_name = f'experiments_{k}'
+        group_name = f'e_{k}'
         for k2, v2 in v.items():
-            name = f'experiment_{k2}'
+            name = f'e_{k2}'
 
             config = OmegaConf.merge(global_config, v2)
             config = parse_omega_config(config)

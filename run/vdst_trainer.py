@@ -143,18 +143,20 @@ class VDSTTrainer(DistributedTrainer):
         
         cmap = plt.get_cmap('jet')
         source_depths, target_depths = [(einx.id('... h w c -> (... h) (w c)', t), t.shape) for t in (source_depths, target_depths)]
-        source_depths, target_depths = [torch.from_numpy(cmap(((t - t.min()) / (t.max() - t.min())).detach().cpu().numpy())).reshape(shape) for t, shape in (source_depths, target_depths)]
-        source_depths, target_depths = [einx.id('h w c -> h (w c)', t) for t in (source_depths, target_depths)]
+        source_depths, target_depths = [torch.from_numpy(cmap(((t - t.min()) / (t.max() - t.min())).detach().cpu().numpy())).reshape(*shape[:-1], 4)[..., :3] for t, shape in (source_depths, target_depths)]
+        # source_depths, target_depths = [einx.id('... h w c -> ... h (w c)', t) for t in (source_depths, target_depths)]
         
-        sources = einx.id('b1 v c h w, b2 v c h w -> ((b1 + b2) h) (v w) c', source_images, source_depths)
-        targets = einx.id('l b1 v c h w, l b2 v c h w -> ((b1 + b2) h) (v l w) c', target_images, target_depths)
+        sources = einx.id('b v h1 w c, b v h2 w c -> (b (h1 + h2)) (v w) c', source_images, source_depths)
+        targets = einx.id('l b v h1 w c, l b v h2 w c -> (b (h1 + h2)) (v l w) c', target_images, target_depths)
         
         is_val_str = 'val' if batch_index < self.val_split // self.val_batch_size else 'train'
         for img, name in [
             (sources, f'sources_{batch_index}_{is_val_str}'),
             (targets, f'targets_{batch_index}_{is_val_str}')
         ]:
-            img = PIL.Image.fromarray((img.numpy() * 255.0).astype(np.uint8))
+            print((img.numpy() * 255.0).astype(np.uint8).shape)
+            img = (img * 255.0).numpy().astype(np.uint8)
+            img = PIL.Image.fromarray(img)
             img_path = os.path.join(path, f'{name}.png')
             img.save(img_path)
             self.logger.log_image(img_path, name)

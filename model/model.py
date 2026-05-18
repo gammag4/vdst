@@ -93,7 +93,7 @@ class VDST(nn.Module):
     # Shape: (B, F, C, H, W)
     def forward(self, scene):
         sources, targets = scene.sources, scene.targets
-        targets_hw = (targets.images if targets.images else sources.images).shape[-2:]
+        targets_hw = (targets.images if targets.images is not None else sources.images).shape[-2:]
         sources_images, sources_depths, normalization_factors = self.normalize_sources(sources.images, sources.depths)
         sources = edict(
             K=sources.K,

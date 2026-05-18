@@ -27,7 +27,7 @@ class VDSTTrainer(DistributedTrainer):
         self.val_intermediate_results_steps = 0
         
         self.val_batch_size = self.config.train.data.val_batch_size
-        self.val_split = 1 * self.val_batch_size # Picking n scenes for validation
+        self.val_split = 2 * self.val_batch_size # Picking n scenes for validation
         
         if self.is_main_process:
             self.eval_metrics = EvalMetrics().to(self.device)

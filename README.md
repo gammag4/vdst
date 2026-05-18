@@ -25,7 +25,8 @@ This model has two main advantages in comparison to other methods:
 - Due to the generalization ability of Transformer-based models across domains, it is capable of generalizing to novel scenes that follow a similar distribution to the original training data;
 - Following the same philosophy as LVSM, our architecture also tries to minimize the inductive bias of the model,
   and we hypothesize that this allows it to achieve better results than other methods when trained for longer periods with sufficiently large amounts of data,
-  although we do not have enough computational resources to verify this, leaving it for future work.
+  although we do not have enough computational resources to verify this, leaving it for future work;
+- It can be trained under constrained resources without diverging (the author used a single RTX 4060 Ti with 8GB vRAM).
 
 ## Training
 

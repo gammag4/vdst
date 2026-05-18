@@ -25,7 +25,8 @@ Esse modelo possui duas vantagens principais em comparação com outros métodos
 - Devido à capacidade de generalização entre domínios de modelos baseados em Transformer, ele é capaz de generalizar para cenas novas que seguem uma distribuição similar à dos dados originais de treino;
 - Seguindo a mesma filosofia do LVSM, nossa arquitetura também tenta minimizar o viés indutivo do modelo,
   e hipotetizamos que isso permite alcançar melhor resultados do que outros métodos quando treinado por períodos mais longos com quantidades suficientemente grandes de dados,
-  apesar de não termos recursos computacionais suficientes para verificar isso, deixando tal investigação como trabalho futuro.
+  apesar de não termos recursos computacionais suficientes para verificar isso, deixando tal investigação como trabalho futuro;
+- Ele pode ser treinado com recursos limitados sem divergir (o autor usou uma única RTX 4060 Ti com 8 GB de VRAM).
 
 ## Treinamento
 

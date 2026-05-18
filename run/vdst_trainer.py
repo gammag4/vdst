@@ -117,7 +117,7 @@ class VDSTTrainer(DistributedTrainer):
     def _try_fit_power_law(self):
         pl_config = self.config.train.metric_power_law_fitting
 
-        if pl_config.should_fit and ((self.is_last and -1 in pl_config.instants) or self.logger.current_iter in pl_config.instants):
+        if pl_config.should_fit and ((self.is_last and -1 in pl_config.instants) or self.logger.current_step in pl_config.instants):
             start_step = self.config.train.optimizer.n_warmup_steps if pl_config.skip_warmup_steps else 0
             points = []  # TODO
             points = points[start_step:]

@@ -30,6 +30,13 @@ Esse modelo possui duas vantagens principais em comparação com outros métodos
 
 ## Treinamento
 
+### Requisitos
+
+Você precisa de:
+
+- Alguma distribuição conda (recomendamos usar [Miniforge](https://conda-forge.org/download/))
+- NVIDIA drivers com suporte para CUDA >= 13.0
+
 ### Baixando e processando datasets
 
 Baixe e processe o dataset WildRGB-D usando o script disponibilizado [aqui](https://github.com/gammag4/nvs_datasets) para a pasta `datasets/wildrgbd`.

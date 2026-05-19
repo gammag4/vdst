@@ -25,9 +25,12 @@ class VDSTTrainer(DistributedTrainer):
         super().__init__(config, config_raw)
         
         self.val_intermediate_results_steps = 0
-        
+
+        # only saves results every 1/10th of the time that eval metrics are computed
+        self.intermediate_results_interval = 10  # TODO
+        num_val_batches = 1  # TODO
         self.val_batch_size = self.config.train.data.val_batch_size
-        self.val_split = 2 * self.val_batch_size # Picking n scenes for validation
+        self.val_split = num_val_batches * self.val_batch_size  # Picking n scenes for validation
         
         if self.is_main_process:
             self.eval_metrics = EvalMetrics().to(self.device)
@@ -54,7 +57,7 @@ class VDSTTrainer(DistributedTrainer):
         train_dataset.random.shuffle(train_dataset.spaths)
         val_dataset.random.shuffle(val_dataset.spaths)
         
-        train_dataset.spaths, val_dataset.spaths = train_dataset.spaths[self.val_split:], val_dataset.spaths[:self.val_split * 2] # One part for scenes not in training another for scenes in training
+        train_dataset.spaths, val_dataset.spaths = train_dataset.spaths[self.val_split:], val_dataset.spaths[:self.val_split]
         
         return train_dataset, val_dataset
     
@@ -129,7 +132,7 @@ class VDSTTrainer(DistributedTrainer):
     def _after_step(self):
         self._try_fit_power_law()
     
-    def _save_intermediate_results(self, path, batch_index, batch_res):
+    def _save_intermediate_results(self, path, batch_index, batch_res, is_train=False):
         source_images, source_depths = batch_res.sources.images, batch_res.sources.depths
         target_gen_images, target_gen_depths = batch_res.gen_targets.images, batch_res.gen_targets.depths
         target_gt_images, target_gt_depths = batch_res.targets.images, batch_res.targets.depths
@@ -149,7 +152,7 @@ class VDSTTrainer(DistributedTrainer):
         sources = einx.id('b v h1 w c, b v h2 w c -> (b (h1 + h2)) (v w) c', source_images, source_depths)
         targets = einx.id('l b v h1 w c, l b v h2 w c -> (b (h1 + h2)) (v l w) c', target_images, target_depths)
         
-        is_val_str = 'val' if batch_index < self.val_split // self.val_batch_size else 'train'
+        is_val_str = 'train' if is_train else 'val'
         for img, name in [
             (sources, f'sources_{batch_index}_{is_val_str}'),
             (targets, f'targets_{batch_index}_{is_val_str}')
@@ -171,14 +174,17 @@ class VDSTTrainer(DistributedTrainer):
         with open(os.path.join(path, 'scenes.txt'), 'w', encoding='utf8') as f:
             f.write('')
         
+        should_save_intermediate_results = self.is_last or self.val_intermediate_results_steps % self.intermediate_results_interval == 0
+        if should_save_intermediate_results:
+            self.val_intermediate_results_steps = 0
+        self.val_intermediate_results_steps += 1
+        
         eval_metricss = []
         for i, batch in enumerate(data_iter):
             batch_res = self.model(batch)
             
-            if self.is_last or self.val_intermediate_results_steps % 10 == 0: # only saves results every 1/10th of the time # TODO refactor
+            if should_save_intermediate_results:
                 self._save_intermediate_results(path, i, batch_res)
-                self.val_intermediate_results_steps = 0
-            self.val_intermediate_results_steps += 1
             
             eval_metrics = self.eval_metrics(batch_res.gen_targets, batch_res.targets, valid_depth_range=(0.001, 20))
             eval_metrics.num_images = eval_metrics.images.psnr.numel()
@@ -215,5 +221,9 @@ class VDSTTrainer(DistributedTrainer):
                 'depth': {f'{i}': w for i, w in enumerate(res.loss.weighted_depth_perceptual_losses.detach().tolist())}
             }
         })
+
+        if self.is_last or self.logger.current_step % (self.config.train.val_steps_interval * self.intermediate_results_interval) == 0:
+            path = os.path.join(self.config.train.checkpoints.path, 'intermediate_results', f'{self.logger.current_step}')
+            self._save_intermediate_results(path, 0, res, is_train=True)
         
         return res.loss.loss

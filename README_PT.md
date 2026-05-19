@@ -30,16 +30,28 @@ Esse modelo possui duas vantagens principais em comparação com outros métodos
 
 ## Treinamento
 
-Para treinar o modelo, baixe os datasets para a pasta `datasets/` e rode:
+### Baixando e processando datasets
 
-```bash
+Baixe e processe o dataset WildRGB-D usando o script disponibilizado [aqui](https://github.com/gammag4/nvs_datasets) para a pasta `datasets/wildrgbd`.
+
+### Criando ambiente
+
+Crie o ambiente Python e instale as dependências:
+
+```sh
 conda create -n vdst python=3.13
 conda activate vdst
 pip install -r requirements.txt
+```
+
+### Treinando o modelo
+
+Rode o script de treino:
+
+```bash
 torchrun --standalone --nproc-per-node=gpu train.py --config config.yaml
 ```
 
 ## Renderizando
 
 Nós também fizemos um renderizador que você pode usar para navegar nas cenas usando esse modelo, você pode encontrá-lo [aqui](https://github.com/gammag4/nvs_renderer).
-

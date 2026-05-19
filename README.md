@@ -30,12 +30,25 @@ This model has two main advantages in comparison to other methods:
 
 ## Training
 
-To train it, download the datasets to `datsets/` folder and run:
+### Downloading and processing datasets
 
-```bash
+Download and process the WildRGB-D dataset using the script provided [here](https://github.com/gammag4/nvs_datasets) to the folder `datasets/wildrgbd`.
+
+### Creating environment
+
+Create the Python environment and install dependencies:
+
+```sh
 conda create -n vdst python=3.13
 conda activate vdst
 pip install -r requirements.txt
+```
+
+### Training the model
+
+Run the train script:
+
+```bash
 torchrun --standalone --nproc-per-node=gpu train.py --config config.yaml
 ```
 

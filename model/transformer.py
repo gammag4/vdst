@@ -54,7 +54,7 @@ class SelfAttn(nn.Module):
     def __init__(self, d_model: int, d_attn: int, n_heads: int, use_qk_norm: bool, qk_norm_eps: float, dropout: float, attn_op: xops.AttentionOp):
         super().__init__()
 
-        assert d_attn % n_heads == 0, f'n_heads should divide d_model'
+        assert d_attn % n_heads == 0, f'n_heads should divide d_attn'
         
         self.n_heads = n_heads
         self.use_qk_norm = use_qk_norm

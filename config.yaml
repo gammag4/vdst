@@ -150,7 +150,7 @@ model:
   d_model: 768
   # Dimension of vector representations in the attention space of transformer block (normally chosen to be equal to d_model)
   d_attn: 768
-  # Number of attention heads in both encoder and decoder (n_heads should divide d_model)
+  # Number of attention heads in both encoder and decoder (n_heads should divide d_attn)
   n_heads: 12
   # Expansion factor for mlp blocks after attention blocks in each transformer block (embeddings will be expanded to e_ff * d_model dimensions then contracted back to d_model dimensions)
   e_ff: 4

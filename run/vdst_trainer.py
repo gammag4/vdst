@@ -17,7 +17,7 @@ from model.model import VDST
 from loss.loss import Loss
 from loss.scheduler import PerceptualLossScheduler
 from loss.eval_metrics import EvalMetrics
-from dataset.wildrgbd import WildRGBDDatasetConstrainedViews
+from dataset.wildrgbd import WildRGBDDataset, WildRGBDDataset2
 
 
 class VDSTTrainer(DistributedTrainer):
@@ -50,12 +50,13 @@ class VDSTTrainer(DistributedTrainer):
         # TODO val should use n scenes from each category
         # TODO use test_dataset in inference to verify
         train_dataset, val_dataset, test_dataset = [
-            WildRGBDDatasetConstrainedViews(
+            WildRGBDDataset(
                 config.datasets.wildrgbd.path,
                 config.n_sources,
                 config.n_targets,
                 output_dims=config.output_dims,
                 train_val_split_index=val_split,
+                use_constrained_views=config.datasets.wildrgbd.use_constrained_views,
                 test_category='truck',
                 split=split,
                 seed=self.config.setup.seed

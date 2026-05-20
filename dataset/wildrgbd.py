@@ -11,12 +11,16 @@ import numpy as np
 import einx
 
 
-class WildRGBDDatasetConstrainedViews(Dataset):
-    def __init__(self, path, n_sources, n_targets, output_dims, train_val_split_index, test_category='truck', split='train', seed=42):
+class WildRGBDDataset(Dataset):
+    def __init__(self, path, n_sources, n_targets, output_dims, train_val_split_index, use_constrained_views=True, test_category='truck', split='train', seed=42):
         self.path = path
         self.n_sources = n_sources
         self.n_targets = n_targets
         self.output_dims = output_dims
+        self.use_constrained_views = use_constrained_views
+        
+        if use_constrained_views:
+            assert self.n_sources == 2, f'use_constrained_views cannot be used with only 2 sources per scene, but {self.n_sources} were requested'
 
         self.seed = seed
         self.random = random.Random(seed)
@@ -40,36 +44,66 @@ class WildRGBDDatasetConstrainedViews(Dataset):
         
         self.spaths = [
             (
-                f'{sname}_{c}',
+                f'{sname}',
                 spath,
-                os.path.join(spath, 'cones', c)
+                # Only uses cone 0 for val and test
+                [os.path.join(spath, 'cones', c) for c in (os.listdir(os.path.join(spath, 'cones')) if split == 'train' else ['0']) if os.path.isdir(os.path.join(spath, 'cones', c))]
             )
-            # Only uses cone 0 for val and test
-            for (sname, spath) in self.spaths for c in (os.listdir(os.path.join(spath, 'cones') if split == 'train' else '0'))
+            for (sname, spath) in self.spaths
         ]
-        self.spaths = [(sname, spath, cpath) for sname, spath, cpath in self.spaths if os.path.isdir(cpath)]
+        
+        if use_constrained_views:
+            self.spaths = [(f'{sname}_{os.path.split(cpath)[1]}', spath, cpath) for sname, spath, cpaths in self.spaths for cpath in cpaths]
+        
         self.random.shuffle(spaths)
 
     def __len__(self):
         return len(self.spaths)
     
+    def get_image_paths(self, cpath, type):
+        return [os.path.join(cpath, type, p) for p in os.listdir(os.path.join(cpath, type))]
+    
+    def get_cam_pose_strs(self, cpath):
+        with open(os.path.join(cpath, 'cam_poses.txt'), 'r', encoding='utf8') as f:
+            return f.read().strip().split('\n')
+    
     def __getitem__(self, i):
         self.random.seed(self.seed + i)
-        sname, spath, cpath = self.spaths[i]
+        if self.use_constrained_views:
+            sname, spath, cpath = self.spaths[i]
+        else:
+            sname, spath, cpaths = self.spaths[i]
         
         with open(os.path.join(spath, 'metadata'), 'r', encoding='utf8') as f:
             data = edict(json.load(f))
             K = torch.tensor(data.K).reshape(3, 3).T
         
-        images, depths = [sorted([os.path.join(cpath, p, p2) for p2 in os.listdir(os.path.join(cpath, p))]) for p in ('rgb', 'depth')]
+        if self.use_constrained_views:
+            images, depths = [sorted(self.get_image_paths(cpath, t)) for t in ('rgb', 'depth')]
+            pose_strs = self.get_cam_pose_strs(cpath)
+            
+            s_pose_strs = sorted(self.get_cam_pose_strs(cpath), key=lambda l: int(l.split(' ')[0]))
+            source_indices = sorted([s_pose_strs.index(pose_strs[0]), s_pose_strs.index(pose_strs[-1])], reverse=True)
+            pose_strs = s_pose_strs
+            
+            images2, depths2, pose_strs2 = [[p[i] for i in source_indices] for p in (images, depths, pose_strs)]
+            for p in images, depths, pose_strs:
+                for i in source_indices:
+                    p.pop(i)
+            
+            images2, depths2, pose_strs2 = [list(i) for i in zip(*self.random.sample(list(zip(images2, depths2, pose_strs2)), self.n_sources))]
+            images, depths, pose_strs = [list(i) for i in zip(*self.random.sample(list(zip(images, depths, pose_strs)), self.n_targets))]
+            images, depths, pose_strs = [p2 + p1 for p1, p2 in ((images, images2), (depths, depths2), (pose_strs, pose_strs2))]
+        else:
+            images, depths = [[p for cpath in cpaths for p in sorted(self.get_image_paths(cpath, t))] for t in ('rgb', 'depth')]
+            pose_strs = [pose for cpath in cpaths for pose in sorted(self.get_cam_pose_strs(cpath), key=lambda l: int(l.split(' ')[0]))]
+            
+            images, depths, pose_strs = [list(i) for i in zip(*self.random.sample(list(zip(images, depths, pose_strs)), self.n_sources + self.n_targets))]
         
-        with open(os.path.join(cpath, 'cam_poses.txt'), 'r', encoding='utf8') as f:
-            lines = f.read().strip().split('\n')
-            c2ws = [torch.tensor([float(i) for i in l.strip().split()[1:]]).reshape(4, 4) for l in lines]
-            R, t = zip(*((c2w[:3, :3], c2w[:3, 3]) for c2w in c2ws))
-        
-        images, depths, R, t = zip(*self.random.sample(list(zip(images, depths, R, t)), self.n_sources + self.n_targets))
         images, depths = [[torch.from_numpy(np.array(PIL.Image.open(path))) for path in paths] for paths in (images, depths)]
+        
+        c2ws = [torch.tensor([float(i) for i in l.strip().split()[1:]]).reshape(4, 4) for l in pose_strs]
+        R, t = zip(*((c2w[:3, :3], c2w[:3, 3]) for c2w in c2ws))
         
         images = [einx.id('h w c -> c h w', image).float() / 255.0 for image in images]
         depths = [einx.id('h w -> 1 h w', depth).int() for depth in depths]
@@ -96,7 +130,6 @@ class WildRGBDDatasetConstrainedViews(Dataset):
         depth_masks = [depth > 0 for depth in depths]
         depths = [depth / 1000.0 for depth in depths]
         
-        
         images, depths, depth_masks, R, t = [torch.stack(t, dim=0) for t in (images, depths, depth_masks, R, t)]
         K = einx.id('m n -> b m n', K, b=images.shape[0])
         
@@ -109,8 +142,8 @@ class WildRGBDDatasetConstrainedViews(Dataset):
             depth_masks=depth_masks
         )
         
-        sources = edict({k: torch.stack(v[0], v[-1]) for k, v in views.items()})
-        targets = edict({k: v[1:-1] for k, v in views.items()})
+        sources = edict({k: v[:2] for k, v in views.items()})
+        targets = edict({k: v[2:] for k, v in views.items()})
         
         return edict(
             scene_name=sname,
@@ -119,8 +152,8 @@ class WildRGBDDatasetConstrainedViews(Dataset):
         )
 
 
-class WildRGBDDataset(Dataset):
-    def __init__(self, path, n_sources, n_targets, output_dims, train_val_split_index, test_category='truck', split='train', seed=42):
+class WildRGBDDataset2(Dataset):
+    def __init__(self, path, n_sources, n_targets, output_dims, train_val_split_index, use_constrained_views=False, test_category='truck', split='train', seed=42):
         self.path = path
         self.n_sources = n_sources
         self.n_targets = n_targets

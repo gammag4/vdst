@@ -188,10 +188,9 @@ class VDSTTrainer(DistributedTrainer):
             for i in range(self.config.train.data.train_batch_size):
                 train_batch.append(self.train_dataset[i])
             
-            sources, targets = [[i[k] for i in train_batch] for k in ('sources', 'targets')]
-            sources, targets = [edict({k: torch.stack(v) for k, v in p.items()}) for p in (sources, targets)]
+            sources, targets = [edict({k: torch.stack([i[p][k] for i in train_batch]) for k in train_batch[0][p].keys()}) for p in ('sources', 'targets')]
             train_batch = edict(
-                scene_names=[i.scene_names for i in train_batch],
+                scene_name=[i.scene_name for i in train_batch],
                 sources=sources,
                 targets=targets
             )

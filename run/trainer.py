@@ -307,7 +307,7 @@ class DistributedTrainer(ABC):
 
         self.logger.start()
         
-        for _ in range(self.n_real_steps):
+        for _ in range(self.logger.current_step, self.n_real_steps):
             try:
                 batch = next(it)
             except StopIteration:

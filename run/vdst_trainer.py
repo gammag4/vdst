@@ -61,6 +61,7 @@ class VDSTTrainer(DistributedTrainer):
                 seed=self.config.setup.seed
             ) for split in ('train', 'val', 'test')
         ]
+        self.train_dataset = train_dataset
         
         return train_dataset, val_dataset
     
@@ -182,6 +183,22 @@ class VDSTTrainer(DistributedTrainer):
             self.val_intermediate_results_steps = 0
         self.val_intermediate_results_steps += 1
         
+        if should_save_intermediate_results:
+            train_batch = []
+            for i in range(self.config.train.data.train_batch_size):
+                train_batch.append(self.train_dataset[i])
+            
+            sources, targets = [[i[k] for i in train_batch] for k in ('sources', 'targets')]
+            sources, targets = [edict({k: torch.stack(v) for k, v in p.items()}) for p in (sources, targets)]
+            train_batch = edict(
+                scene_names=[i.scene_names for i in train_batch],
+                sources=sources,
+                targets=targets
+            )
+            
+            train_res = self.model(train_batch)
+            self._save_intermediate_results(path, 0, train_res, is_train=True)
+        
         eval_metricss = []
         for i, batch in enumerate(data_iter):
             batch_res = self.model(batch)
@@ -224,9 +241,5 @@ class VDSTTrainer(DistributedTrainer):
                 'depth': {f'{i}': w for i, w in enumerate(res.loss.weighted_depth_perceptual_losses.detach().tolist())}
             }
         })
-
-        if self.is_last or self.logger.current_step % (self.config.train.val_steps_interval * self.intermediate_results_interval) == 0:
-            path = os.path.join(self.config.train.checkpoints.path, 'intermediate_results', f'{self.logger.current_step}')
-            self._save_intermediate_results(path, 0, res, is_train=True)
         
         return res.loss.loss

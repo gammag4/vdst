@@ -105,16 +105,16 @@ class PoseEncoder(nn.Module):
                 if self.config.has_input_depth_masks:
                     c += 1
         
-        in_features = (6 + c) * self.p ** 2
+        d_input = (6 + c) * self.p ** 2
         
         if self.config.enc_layer_norm:
             self.embed_encoder_norm = nn.Sequential(
-                nn.LayerNorm(in_features),
-                nn.Linear(in_features=in_features, out_features=in_features, bias=False)
-            ) if self.config.enc_residual_layer_norm else nn.LayerNorm(in_features)
+                nn.LayerNorm(d_input),
+                nn.Linear(in_features=d_input, out_features=d_input, bias=False)
+            ) if self.config.enc_residual_layer_norm else nn.LayerNorm(d_input)
         
         self.embed_encoder_linear = nn.Linear(
-            in_features=in_features,
+            in_features=d_input,
             out_features=self.d_model,
             bias=False
         )

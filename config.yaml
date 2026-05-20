@@ -47,7 +47,7 @@ train:
   # Display logs every n steps
   display_log_steps_interval: 10
   # Do evaluation and save results after every n steps
-  val_steps_interval: 100
+  val_steps_interval: 50
 
   # Power law fitting settings
   metric_power_law_fitting:
@@ -63,7 +63,7 @@ train:
     # Number of warmup steps before going to cosine learning rate
     n_warmup_steps: 3000
     # Learning rate
-    lr: 4e-4
+    lr: 1e-4
     # AdamW betas
     betas: [0.999, 0.999]
     # AdamW weight decay

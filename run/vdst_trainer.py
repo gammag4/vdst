@@ -161,7 +161,6 @@ class VDSTTrainer(DistributedTrainer):
             (sources, f'sources_{batch_index}_{is_val_str}'),
             (targets, f'targets_{batch_index}_{is_val_str}')
         ]:
-            print((img.numpy() * 255.0).astype(np.uint8).shape)
             img = (img * 255.0).numpy().astype(np.uint8)
             img = PIL.Image.fromarray(img)
             img_path = os.path.join(path, f'{name}.png')

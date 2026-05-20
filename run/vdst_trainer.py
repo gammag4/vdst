@@ -17,7 +17,7 @@ from model.model import VDST
 from loss.loss import Loss
 from loss.scheduler import PerceptualLossScheduler
 from loss.eval_metrics import EvalMetrics
-from dataset.wildrgbd import WildRGBDDataset
+from dataset.wildrgbd import WildRGBDDatasetConstrainedViews
 
 
 class VDSTTrainer(DistributedTrainer):
@@ -29,8 +29,6 @@ class VDSTTrainer(DistributedTrainer):
         # only saves results every 1/10th of the time that eval metrics are computed
         self.intermediate_results_interval = 10  # TODO
         num_val_batches = 1  # TODO
-        self.val_batch_size = self.config.train.data.val_batch_size
-        self.val_split = num_val_batches * self.val_batch_size  # Picking n scenes for validation
         
         if self.is_main_process:
             self.eval_metrics = EvalMetrics().to(self.device)
@@ -45,19 +43,24 @@ class VDSTTrainer(DistributedTrainer):
         return super().load_state_dict(state_dict)
     
     def _create_datasets(self, config):
-        train_dataset, val_dataset = [
-            WildRGBDDataset(
+        # Picking n scenes for validation
+        num_val_batches = 1
+        val_split = num_val_batches * self.config.train.data.val_batch_size
+        
+        # TODO val should use n scenes from each category
+        # TODO use test_dataset in inference to verify
+        train_dataset, val_dataset, test_dataset = [
+            WildRGBDDatasetConstrainedViews(
                 config.datasets.wildrgbd.path,
                 config.n_sources,
                 config.n_targets,
                 output_dims=config.output_dims,
+                train_val_split_index=val_split,
+                test_category='truck',
+                split=split,
                 seed=self.config.setup.seed
-            ) for _ in range(2)
+            ) for split in ('train', 'val', 'test')
         ]
-        train_dataset.random.shuffle(train_dataset.spaths)
-        val_dataset.random.shuffle(val_dataset.spaths)
-        
-        train_dataset.spaths, val_dataset.spaths = train_dataset.spaths[self.val_split:], val_dataset.spaths[:self.val_split]
         
         return train_dataset, val_dataset
     

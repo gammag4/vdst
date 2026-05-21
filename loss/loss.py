@@ -4,7 +4,7 @@ import einx
 import torch.nn.functional as F
 from easydict import EasyDict as edict
 
-from .multiscale_grad import multiscale_grad_loss
+from .multiscale_grad import MultiScaleGradLoss
 from .perceptual import PerceptualLoss
 
 
@@ -19,6 +19,7 @@ class Loss(nn.Module):
         # perceptual_weights = torch.tensor([1.6, 1.0, 0.8, 0.7, 0.5, 0.5, 0.5, 0.5, 0.5)#, 0.2])
         perceptual_weights = torch.concat([torch.tensor([2.0]), torch.full((8,), 1.0)])
         self.perceptual = PerceptualLoss(layer_weights=perceptual_weights, dist_fn_raw=torch.square, dist_fn=torch.abs)
+        self.multiscale_grad_loss = MultiScaleGradLoss(n_scales=4)
         
         self.eval()
         for param in self.parameters():
@@ -47,7 +48,7 @@ class Loss(nn.Module):
         
         depth_silog_loss_train = ldsm - self.silog_ms_lambda * ldms
         
-        depth_multiscale_grad_loss = multiscale_grad_loss(depths_log, depths_gt_log, depths_gt_masks)
+        depth_multiscale_grad_loss = self.multiscale_grad_loss(depths_log, depths_gt_log, depths_gt_masks)
         
         # TODO maybe use network trained specifically for depth
         rlog, tlog = depths_log, depths_gt_log

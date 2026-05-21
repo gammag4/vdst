@@ -29,7 +29,9 @@ experiments:
   #     train:
   #       optimizer:
   #         lr: 1e-4
-  #   S-VDST: # Spatial VDST 
+  #   S-VDST: # Spatial VDST
+  #     model:
+  #       depth_input_type: spatial
   #     train:
   #       optimizer:
   #         lr: 1e-4
@@ -49,6 +51,7 @@ experiments:
   #   SP-VDST: # Spatial-Pixel VDST
   #     # Maybe add residual connection in tokens and use d_model=d_attn=d_input
   #     model:
+  #       depth_input_type: spatial
   #       p: 1
   #       d_model: 16
   #       d_attn: 16

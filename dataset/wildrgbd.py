@@ -34,28 +34,29 @@ class WildRGBDDataset(Dataset):
             cpaths = [(c, cpath) for c, cpath in cpaths if os.path.isdir(cpath)]
         
         spaths = [(f'{c}_{s}', os.path.join(cpath, 'scenes', s)) for c, cpath in cpaths for s in os.listdir(os.path.join(cpath, 'scenes'))]
-        self.spaths = [(sname, spath) for sname, spath in spaths if os.path.isdir(spath)]
+        spaths = [(sname, spath) for sname, spath in spaths if os.path.isdir(spath)]
         
         self.random.shuffle(spaths)
         if split == 'train':
-            self.spaths = self.spaths[train_val_split_index:]
+            spaths = spaths[train_val_split_index:]
         elif split == 'val':
-            self.spaths = self.spaths[:train_val_split_index]
+            spaths = spaths[:train_val_split_index]
         
-        self.spaths = [
+        spaths = [
             (
                 f'{sname}',
                 spath,
                 # Only uses cone 0 for val and test
                 [os.path.join(spath, 'cones', c) for c in (os.listdir(os.path.join(spath, 'cones')) if split == 'train' else ['0']) if os.path.isdir(os.path.join(spath, 'cones', c))]
             )
-            for (sname, spath) in self.spaths
+            for (sname, spath) in spaths
         ]
         
         if use_constrained_views:
-            self.spaths = [(f'{sname}_{os.path.split(cpath)[1]}', spath, cpath) for sname, spath, cpaths in self.spaths for cpath in cpaths]
+            spaths = [(f'{sname}_{os.path.split(cpath)[1]}', spath, cpath) for sname, spath, cpaths in self.spaths for cpath in cpaths]
         
         self.random.shuffle(spaths)
+        self.spaths = spaths
 
     def __len__(self):
         return len(self.spaths)
@@ -171,13 +172,14 @@ class WildRGBDDataset2(Dataset):
             cpaths = [(c, cpath) for c, cpath in cpaths if os.path.isdir(cpath)]
         
         spaths = [(f'{c}_{s}', os.path.join(cpath, 'scenes', s)) for c, cpath in cpaths for s in os.listdir(os.path.join(cpath, 'scenes'))]
-        self.spaths = [(sname, spath) for sname, spath in spaths if os.path.isdir(spath)]
+        spaths = [(sname, spath) for sname, spath in spaths if os.path.isdir(spath)]
         
         self.random.shuffle(spaths)
         if split == 'train':
-            self.spaths = self.spaths[train_val_split_index:]
+            spaths = spaths[train_val_split_index:]
         elif split == 'val':
-            self.spaths = self.spaths[:train_val_split_index]
+            spaths = spaths[:train_val_split_index]
+        self.spaths = spaths
     
     def __len__(self):
         return len(self.spaths)

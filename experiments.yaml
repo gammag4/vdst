@@ -23,12 +23,17 @@ setup:
   out_path: results/experiments/
   total_experiment_steps: 30000
 
-# Compute how much more computation is needed when comparing two models:
-# compare_models = lambda d_model_1, n_tokens_1, d_model_2, n_tokens_2: (lambda x, a, b: x(*a) / x(*b))(lambda n, d: (n + d) * (n * d), (d_model_1, n_tokens_1), (d_model_2, n_tokens_2))
-# e.g.: compare_models(768, (256//8) ** 2, 16, (64//1) ** 2) = 5.23 (first model is 5x slower than second)
 experiments:
-  # models:
-  #   vdst_pixel:
+  # spatial_pixel:
+  #   VDST:
+  #     train:
+  #       optimizer:
+  #         lr: 1e-4
+  #   S-VDST: # Spatial VDST 
+  #     train:
+  #       optimizer:
+  #         lr: 1e-4
+  #   P-VDST: # Pixel VDST
   #     # Maybe add residual connection in tokens and use d_model=d_attn=d_input
   #     model:
   #       p: 1
@@ -41,7 +46,42 @@ experiments:
   #         output_dims: [64, 64]
   #         train_batch_size: 8
   #         val_batch_size: 8
-  vdst:
-    train:
-      optimizer:
-        lr: 1e-4
+  #   SP-VDST: # Spatial-Pixel VDST
+  #     # Maybe add residual connection in tokens and use d_model=d_attn=d_input
+  #     model:
+  #       p: 1
+  #       d_model: 16
+  #       d_attn: 16
+  #       n_heads: 1
+  #       e_ff: 4
+  #     train:
+  #       data:
+  #         output_dims: [64, 64]
+  #         train_batch_size: 8
+  #         val_batch_size: 8
+  d mask:
+    with d mask:
+      model:
+        has_input_depth_masks: true
+    without d mask:
+      model:
+        has_input_depth_masks: false
+  isolated losses:
+    regular:
+      loss:
+        weights: [2.0,2.0,0.7,1.5,1.0]
+    without i mse:
+      loss:
+        weights: [0.0,2.0,0.7,1.5,1.0]
+    without i percep:
+      loss:
+        weights: [2.0,0.0,0.7,1.5,1.0]
+    without d silog:
+      loss:
+        weights: [2.0,2.0,0.0,1.5,1.0]
+    without d mscale grad:
+      loss:
+        weights: [2.0,2.0,0.7,0.0,1.0]
+    without d percep:
+      loss:
+        weights: [2.0,2.0,0.7,0.0,1.0]

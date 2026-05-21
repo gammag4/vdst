@@ -33,7 +33,7 @@ def compute_view_rays_from_vecs(vecs: torch.Tensor, K: torch.Tensor, R: torch.Te
     d = einx.dot('... c2 x1, ... x1 c, c h w -> ... c2 h w', R, K.inverse(), vecs)  # c2w: R K^-1 x_ij,cam + t - o = R K^-1 x_ij,cam
     # d = einx.dot('... x1 c2, ... x1 c, c h w -> ... c2 h w', R, K.inverse(), vecs)  # w2c: R^T K^-1 x_ij,cam - R^T t - o = R^T K^-1 x_ij,cam
 
-    d = d / einx.sum('... [c] h w -> ... 3 h w', d * d).sqrt()  # normalize d
+    d = d / einx.sum('... [c] h w -> ... 3 h w', d ** 2).sqrt()  # normalize d
 
     # o: (B, 3, 1, 1), d: (B, 3, H, W)
     return o, d
@@ -57,16 +57,24 @@ def compute_view_rays(K: torch.Tensor, R: torch.Tensor, t: torch.Tensor, pad: tu
     return o, d
 
 
-def compute_plucker_rays(o: torch.Tensor, d: torch.Tensor, use_plucker=True):
+def compute_plucker_rays(o: torch.Tensor, d: torch.Tensor, ray_embedding):
     # o, d: (B, 3, H, W)
 
-    if not use_plucker:
-        return torch.concat([o, d], dim=-3)
-
-    l = o.cross(d, dim=-3)
-    rays = torch.concat([d, l], dim=-3)
-
-    # rays: (B, 6, H, W)
+    if ray_embedding == 'plucker':
+        l = o.cross(d, dim=-3)
+        rays = torch.concat([d, l], dim=-3)
+    elif ray_embedding == 'origin_direction':
+        rays = torch.concat([o, d], dim=-3)
+    elif ray_embedding == 'origin_only':
+        rays = o
+    elif ray_embedding == 'direction_only':
+        rays = d
+    elif ray_embedding is None:
+        return None
+    else:
+        assert False, f'Invalid ray embedding "{ray_embedding}"'
+    
+    # rays: (B, ray_C, H, W)
     return rays
 
 
@@ -93,19 +101,27 @@ class PoseEncoder(nn.Module):
         self.d_model = self.config.d_model
         self.C = self.config.C
         self.p = self.config.p
-        self.use_plucker = self.config.use_plucker
-
+        self.ray_embedding = self.config.ray_embedding_query if is_query_encoder else self.config.ray_embedding_source
+        
+        assert not is_query_encoder or self.ray_embedding in ['plucker', 'origin_direction'], f'Invalid ray embedding for query pose encoder "{self.ray_embedding}"'
+        
+        assert self.config.depth_input_type in ['depth', 'spatial', None], f'Invalid depth input type "{self.config.depth_input_type}"'
+        
         c = 0
         if not self.is_query_encoder:
             c = self.C
             
-            if self.config.has_input_depths:
-                c += 1
+            if self.config.depth_input_type in ['depth', 'spatial']:
+                if self.config.depth_input_type == 'depth':
+                    c += 1
+                elif self.config.depth_input_type == 'spatial':
+                    c += 3
                 
                 if self.config.has_input_depth_masks:
                     c += 1
         
-        d_input = (6 + c) * self.p ** 2
+        ray_c = 0 if self.ray_embedding is None else 3 if self.ray_embedding in ['origin_only', 'direction_only'] else 6
+        d_input = (ray_c + c) * self.p ** 2
         
         if self.config.enc_layer_norm:
             self.embed_encoder_norm = nn.Sequential(
@@ -118,6 +134,7 @@ class PoseEncoder(nn.Module):
             out_features=self.d_model,
             bias=False
         )
+        self.d_input = d_input
 
     # HW = tuple with height and width
     # Set both if image has been resized, specifying original image height and width in HW
@@ -139,19 +156,24 @@ class PoseEncoder(nn.Module):
         hw, pad = compute_pad(hw, self.p)
         if not self.is_query_encoder:
             images = F.pad(images, pad, 'constant', 0)
-            if self.config.has_input_depths:
+            if self.config.depth_input_type is not None:
                 depths = F.pad(depths, pad, 'constant', 0)
                 depth_masks = F.pad(depth_masks, pad, 'constant', False)
-
-        o, d = compute_view_rays(K, R, t, pad, hw)
-        plucker_rays = compute_plucker_rays(o, d, self.use_plucker)  # (B, 6, H, W)
         
-        exp_inputs = [plucker_rays]
+        o, d = compute_view_rays(K, R, t, pad, hw)
+        
+        if self.config.depth_input_type == 'spatial':
+            depths = einx.id('b 1 h w -> b c h w', depths, c=3)
+            depths = d * depths
+        
+        plucker_rays = compute_plucker_rays(o, d, self.ray_embedding)  # (B, ray_C, H, W)
+        
+        exp_inputs = [plucker_rays] if plucker_rays is not None else []
         
         if not self.is_query_encoder:
             exp_inputs.append(images)
             
-            if self.config.has_input_depths:
+            if self.config.depth_input_type is not None:
                 exp_inputs.append(depths)
                 
                 if self.config.has_input_depth_masks:
@@ -162,7 +184,7 @@ class PoseEncoder(nn.Module):
         exp = f'{left_exp} -> ... (h w) (({right_exp}) p1 p2)'
 
         # Concatenating image with rays and rearranging into embeddings
-        # (B, HW/p^2, (6 + C) * p^2)
+        # (B, HW/p^2, (ray_C + C) * p^2)
         embeds = einx.id(
             # Full exp: '... c0 (h p1) (w p2), ... c1 (h p1) (w p2), ... c2 (h p1) (w p2), ... c3 (h p1) (w p2) -> ... (h w) ((c0 + c1 + c2 + c3) p1 p2)',
             exp,
@@ -171,7 +193,7 @@ class PoseEncoder(nn.Module):
             p2=self.p
         )
 
-        # (B, HW/p^2, (6 + C) * p^2), (...B, C, H, W), (4,)
+        # (B, HW/p^2, (ray_C + C) * p^2), (...B, C, H, W), (4,)
         return embeds, depth_masks, pad
 
     # HW = tuple with height and width

@@ -136,12 +136,18 @@ model:
   p: 8
   # Number of color channels in each frame
   C: 3
-  # Whether to use plucker rays or raw origin-direction vector pairs
-  use_plucker: true
-  # Whether the model also has input depths or if it tries to estimate depths just from source images
-  has_input_depths: true
+  # Ray embedding for sources pose encoder
+  # Can be either 'plucker' (uses plucker ray embeddings), 'origin_direction' (uses raw camera origin and directions), 'origin_only' (uses only raw camera origin), 'direction_only' (uses only raw direction) or null (no ray embeddings)
+  # 'origin_only', 'direction_only' or null only make sense if depth_input_type is 'spatial', otherwise the problem is underconstrained
+  ray_embedding_source: plucker
+  # Ray embedding for queries pose encoder
+  # Can be either 'plucker' or 'origin_direction', otherwise the problem is underconstrained
+  ray_embedding_query: plucker
+  # How will depths be input into the model
+  # Can be either 'depth' (inputs depths), 'spatial' (inputs global pixel positions in space) or null (no depth inputs, just uses source images)
+  depth_input_type: depth # TODO implement 'spatial'
   # Whether the model also has input depth masks to know whether pixels are valid or not
-  # This is ignored if has_input_depths = false
+  # This is ignored if depth_input_type is null
   has_input_depth_masks: true
 
   # Number of layers in transformer

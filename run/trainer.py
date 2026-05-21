@@ -11,7 +11,7 @@ import torch.distributed as dist
 import torch.amp as amp
 from utils.grad_scaler import GradScaler
 
-from utils.other import print_model_stats, find_unused_model_params
+from utils.other import print_model_stats
 from utils.timer import Timer
 
 
@@ -218,8 +218,6 @@ class DistributedTrainer(ABC):
         # Scales the loss, and calls backward()
         # to create scaled gradients
         self.grad_scaler.scale(loss).backward()  # Already called in model
-
-        # find_unused_params(self.model) # TODO
 
         # All gradients are scaled in this region up to scaler.step(optimizer), so they need to be unscaled to be used
         # Unscales the gradients of optimizer's assigned params in-place

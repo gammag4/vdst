@@ -53,5 +53,4 @@ def find_unused_model_params(model):
 
 def get_folder_size(path):
     # Neither os or shutil give accurate results
-    # TODO add windows equivalent
     return int(try_run_cmd(f'du -sb "{path}"', raise_err=True).split()[0])

@@ -1,8 +1,6 @@
 # Configs for setting up train/eval environments
 setup:
   # Chooses whether to benchmark kernels
-  # TODO Disabled for now since the input data will have variable sizes
-  # TODO check if it is rerunning benchmarks
   benchmark_kernels: false
   # Uses only deterministic algorithms, impacts performance a lot
   use_deterministic_algorithms: false
@@ -84,7 +82,7 @@ train:
     # clip_norm: 2.0 # when using abs
     # # Maximum gradient norm allowed before skipping
     # skip_norm: 5.0 # when using abs
-  
+
   logger:
     project_name: VDST
     run_group_name: null
@@ -126,7 +124,7 @@ train:
     # Perceptual loss config
     perceptual:
       # Either 'constant' or 'falling_perceptual'
-      scheduler: 'falling_perceptual'
+      scheduler: falling_perceptual
     # SILog loss config
     silog:
       # How much to penalize absolute scale errors

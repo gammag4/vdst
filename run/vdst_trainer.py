@@ -1,7 +1,7 @@
 import os
-import PIL
 import yaml
 from easydict import EasyDict as edict
+import cv2
 import torch
 import numpy as np
 from torch.optim.lr_scheduler import ConstantLR, ChainedScheduler, LinearLR, CosineAnnealingLR
@@ -17,7 +17,7 @@ from model.model import VDST
 from loss.loss import Loss
 from loss.scheduler import PerceptualLossScheduler
 from loss.eval_metrics import EvalMetrics
-from dataset.wildrgbd import WildRGBDDataset, WildRGBDDataset2
+from dataset.wildrgbd import WildRGBDDataset
 
 
 class VDSTTrainer(DistributedTrainer):
@@ -163,9 +163,9 @@ class VDSTTrainer(DistributedTrainer):
             (targets, f'targets_{batch_index}_{is_val_str}')
         ]:
             img = (img * 255.0).numpy().astype(np.uint8)
-            img = PIL.Image.fromarray(img)
             img_path = os.path.join(path, f'{name}.png')
-            img.save(img_path)
+            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+            cv2.imwrite(img_path, img)
             self.logger.log_image(img_path, name)
         
         with open(os.path.join(path, 'scenes.txt'), 'a', encoding='utf8') as f:

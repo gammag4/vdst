@@ -14,3 +14,4 @@ wandb==0.26.1
 python-dotenv==1.2.2
 PyYAML==6.0.3
 aiohttp==3.13.5
+opencv-python==4.13.0.92

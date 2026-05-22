@@ -148,7 +148,7 @@ model:
   depth_input_type: depth # TODO implement 'spatial'
   # Whether the model also has input depth masks to know whether pixels are valid or not
   # This is ignored if depth_input_type is null
-  has_input_depth_masks: true
+  has_input_depth_masks: false
 
   # Number of layers in transformer
   n_layers: 6

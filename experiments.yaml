@@ -1,7 +1,6 @@
 overrides:
   model:
     depth_input_type: depth
-    has_input_depth_masks: true
     enc_layer_norm: false
     enc_residual_layer_norm: false
     dec_layer_norm: false

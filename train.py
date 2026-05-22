@@ -36,17 +36,16 @@ async def main():
                 if res == 'ended':
                     print('Experiments already ran.')
                     return
-                start_experiment_id = int(res)
+                run_group_name, run_name = res.split('\n')[:2]
+                start_experiment_id = [e.train.logger.run_group_name == run_group_name and e.train.logger.run_name == run_name for e, c in experiments].index(True)
         except FileNotFoundError:
             start_experiment_id = 0
         
         print('Running experiments ...\n')
         
-        for i, (config, config_raw) in enumerate(experiments[start_experiment_id:], start=start_experiment_id):
+        for config, config_raw in experiments[start_experiment_id:]:
             with open(experiments_checkpoint_path, 'w', encoding='utf8') as f:
-                f.write(str(i))
-            
-            print(f'Running experiment {i} ...\n')
+                f.write(f'{config.train.logger.run_group_name}\n{config.train.logger.run_name}')
             
             await run_experiment(config, config_raw)
         

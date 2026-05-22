@@ -193,8 +193,8 @@ class PoseEncoder(nn.Module):
             p2=self.p
         )
 
-        # (B, HW/p^2, (ray_C + C) * p^2), (...B, C, H, W), (4,)
-        return embeds, depth_masks, pad
+        # (B, HW/p^2, (ray_C + C) * p^2), (4,)
+        return embeds, pad
 
     # HW = tuple with height and width
     # Set both if image has been resized, specifying original image height and width in HW
@@ -203,7 +203,7 @@ class PoseEncoder(nn.Module):
     # We assume that the K matrix uses xy mapping instead of uv (sensor area is real in range [(0, 0), (h, w)], not [(0, 0), (1, 1)])
     # We assume images are in type float with colors in range 0-1
     def forward(self, batch):
-        embeds, depth_masks, pad = self.create_embeds(batch)
+        embeds, pad = self.create_embeds(batch)
         
         if self.config.enc_layer_norm:
             out_embeds = self.embed_encoder_norm(embeds)
@@ -214,4 +214,4 @@ class PoseEncoder(nn.Module):
         out_embeds = self.embed_encoder_linear(out_embeds)
 
         # (B, n_lat, d_model), (...B, C, H, W), (4,)
-        return out_embeds, depth_masks, pad
+        return out_embeds, pad

@@ -110,8 +110,8 @@ class VDST(nn.Module):
             hw=targets_hw
         )
 
-        source_embeds, source_depth_mask, _ = self.pose_encoder_source(sources) # TODO do something with source depth mask
-        query_embeds, _, pad = self.pose_encoder_query(queries)
+        source_embeds, _ = self.pose_encoder_source(sources)
+        query_embeds, pad = self.pose_encoder_query(queries)
         targets_hw_padded = targets_hw[0] + pad[2] + pad[3], targets_hw[1] + pad[0] + pad[1]
 
         orig_query_shape = query_embeds.shape

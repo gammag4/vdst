@@ -62,13 +62,6 @@ experiments:
   #         output_dims: [64, 64]
   #         train_batch_size: 8
   #         val_batch_size: 8
-  d mask:
-    with d mask:
-      model:
-        has_input_depth_masks: true
-    without d mask:
-      model:
-        has_input_depth_masks: false
   isolated losses:
     regular:
       loss:
@@ -88,3 +81,51 @@ experiments:
     without d percep:
       loss:
         weights: [2.0,2.0,0.7,0.0,1.0]
+
+old_experiments:
+  lr:
+    lr 2e-3 5k warmup:
+      train:
+        optimizer:
+          lr: 2e-3
+          n_warmup_steps: 5000
+    lr 1e-3:
+      train:
+        optimizer:
+          lr: 1e-3
+    lr 1e-4:
+      train:
+        optimizer:
+          lr: 1e-4
+    lr 1e-5:
+      train:
+        optimizer:
+          lr: 1e-5
+  lr 2:
+    lr 5e-4:
+      train:
+        optimizer:
+          lr: 5e-4
+    lr 2e-4:
+      train:
+        optimizer:
+          lr: 2e-4
+    lr 1e-4:
+      train:
+        optimizer:
+          lr: 1e-4
+    lr 8e-5 5k warmup:
+      train:
+        optimizer:
+          lr: 8e-5
+    lr 5e-5:
+      train:
+        optimizer:
+          lr: 5e-5
+  d mask:
+    with d mask:
+      model:
+        has_input_depth_masks: true
+    without d mask:
+      model:
+        has_input_depth_masks: false

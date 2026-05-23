@@ -72,8 +72,11 @@ class EvalMetrics(nn.Module):
         depths_silog_raw = ldsm - ldms
         depths_silog = 100.0 * depths_silog_raw.sqrt()
         # SNR = mean^2 / std^2
-        depths_snr = ldms / depths_silog_raw
-        depths_sqrt_snr = depths_snr.sqrt()
+        # If this metric is falling, that means that the error of the absolute component is falling faster than the relative one
+        # (and the converse is true if it is rising)
+        # This can help choosing the right weights for absolute and relative losses
+        depths_snr_log = ldms / depths_silog_raw
+        depths_sqrt_snr_log = depths_snr_log.sqrt()
         
         depths_log_10 = depths.log10()
         depths_gt_log_10 = depths_gt.log10()
@@ -98,8 +101,8 @@ class EvalMetrics(nn.Module):
             delta_1_25_3=depths_delta_1_25_3,
             
             silog=depths_silog,
-            snr=depths_snr,
-            sqrt_snr=depths_sqrt_snr,
+            snr_log=depths_snr_log,
+            sqrt_snr_log=depths_sqrt_snr_log,
             mean_log10=depths_mean_log10
         )
         

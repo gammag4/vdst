@@ -63,23 +63,29 @@ experiments:
   #         val_batch_size: 8
   isolated losses:
     regular:
-      loss:
-        weights: [2.0,2.0,0.7,1.5,1.0]
+      train:
+        loss:
+          weights: [2.0,2.0,0.7,1.5,1.0]
     without i mse:
-      loss:
-        weights: [0.0,2.0,0.7,1.5,1.0]
+      train:
+        loss:
+          weights: [0.0,2.0,0.7,1.5,1.0]
     without i percep:
-      loss:
-        weights: [2.0,0.0,0.7,1.5,1.0]
+      train:
+        loss:
+          weights: [2.0,0.0,0.7,1.5,1.0]
     without d silog:
-      loss:
-        weights: [2.0,2.0,0.0,1.5,1.0]
+      train:
+        loss:
+          weights: [2.0,2.0,0.0,1.5,1.0]
     without d mscale grad:
-      loss:
-        weights: [2.0,2.0,0.7,0.0,1.0]
+      train:
+        loss:
+          weights: [2.0,2.0,0.7,0.0,1.0]
     without d percep:
-      loss:
-        weights: [2.0,2.0,0.7,0.0,1.0]
+      train:
+        loss:
+          weights: [2.0,2.0,0.7,0.0,1.0]
 
 old_experiments:
   lr:

@@ -25,10 +25,13 @@ class VDSTTrainer(DistributedTrainer):
         super().__init__(config, config_raw)
         
         self.val_intermediate_results_steps = 0
-
+        self.use_entire_val_datset_steps = 0
+        self.intermediate_results_num_train_batches = 1
+        self.intermediate_results_num_val_batches = 1
+        
         # only saves results every 1/10th of the time that eval metrics are computed
-        self.intermediate_results_interval = 10  # TODO
-        num_val_batches = 1  # TODO
+        self.val_intermediate_results_interval = 10
+        self.use_entire_val_datset_interval = 20
         
         if self.is_main_process:
             self.eval_metrics = EvalMetrics().to(self.device)
@@ -44,23 +47,25 @@ class VDSTTrainer(DistributedTrainer):
     
     def _create_datasets(self, config):
         # Picking n scenes for validation
-        num_val_batches = 1
-        val_split = num_val_batches * self.config.train.data.val_batch_size
+        val_split = 0.01
+        test_split = 0.02
         
         # TODO val should use n scenes from each category
         # TODO use test_dataset in inference to verify
-        train_dataset, val_dataset, test_dataset = [
+        train_dataset, val_dataset, test_dataset, test_new_category_dataset = [
             WildRGBDDataset(
                 config.datasets.wildrgbd.path,
                 config.n_sources,
                 config.n_targets,
                 output_dims=config.output_dims,
-                train_val_split_index=val_split,
                 use_constrained_views=config.datasets.wildrgbd.use_constrained_views,
-                test_category='truck',
+                val_split=val_split,
+                test_split=test_split,
                 split=split,
+                test_category='truck',
                 seed=self.config.setup.seed
-            ) for split in ('train', 'val', 'test')
+            )
+            for split in ('train', 'val', 'test', 'test_new_category')
         ]
         self.train_dataset = train_dataset
         
@@ -178,30 +183,40 @@ class VDSTTrainer(DistributedTrainer):
         with open(os.path.join(path, 'scenes.txt'), 'w', encoding='utf8') as f:
             f.write('')
         
-        should_save_intermediate_results = self.is_last or self.val_intermediate_results_steps % self.intermediate_results_interval == 0
+        should_save_intermediate_results = self.is_last or self.val_intermediate_results_steps % self.val_intermediate_results_interval == 0
         if should_save_intermediate_results:
             self.val_intermediate_results_steps = 0
         self.val_intermediate_results_steps += 1
         
+        should_use_entire_val_dataset = self.is_last or self.use_entire_val_datset_steps % self.use_entire_val_datset_interval == 0
+        if should_use_entire_val_dataset:
+            self.use_entire_val_datset_steps = 0
+        self.use_entire_val_datset_steps += 1
+
+        # Always uses only number specified of batches for intermediate results of scenes used in training
         if should_save_intermediate_results:
-            train_batch = []
-            for i in range(self.config.train.data.train_batch_size):
-                train_batch.append(self.train_dataset[i])
-            
-            sources, targets = [edict({k: torch.stack([i[p][k] for i in train_batch]) for k in train_batch[0][p].keys()}) for p in ('sources', 'targets')]
-            train_batch = edict(
-                scene_name=[i.scene_name for i in train_batch],
-                sources=sources,
-                targets=targets
-            )
-            
-            train_res = self.model(train_batch)
-            self._save_intermediate_results(path, 0, train_res, is_train=True)
+            for j in range(self.intermediate_results_num_train_batches):
+                train_batch = []
+                for i in range(j * self.config.train.data.train_batch_size, (j + 1) * self.config.train.data.train_batch_size):
+                    train_batch.append(self.train_data.dataset[i])
+                
+                sources, targets = [edict({k: torch.stack([i[p][k] for i in train_batch]) for k in train_batch[0][p].keys()}) for p in ('sources', 'targets')]
+                train_batch = edict(
+                    scene_name=[i.scene_name for i in train_batch],
+                    sources=sources,
+                    targets=targets
+                )
+                
+                train_res = self.model(train_batch)
+                self._save_intermediate_results(path, 0, train_res, is_train=True)
         
         eval_metricss = []
         for i, batch in enumerate(data_iter):
+            if not should_use_entire_val_dataset and i >= self.intermediate_results_num_val_batches:
+                break
             batch_res = self.model(batch)
             
+            # Always uses only number specified of batches for intermediate results of validation scenes
             if should_save_intermediate_results:
                 self._save_intermediate_results(path, i, batch_res)
             

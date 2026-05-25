@@ -12,7 +12,7 @@ import einx
 
 
 class WildRGBDDataset(Dataset):
-    def __init__(self, path, n_sources, n_targets, output_dims, train_val_split_index, use_constrained_views=True, test_category='truck', split='train', seed=42):
+    def __init__(self, path, n_sources, n_targets, output_dims, use_constrained_views, val_split, test_split, split='train', test_category='truck', seed=42):
         self.path = path
         self.n_sources = n_sources
         self.n_targets = n_targets
@@ -21,61 +21,72 @@ class WildRGBDDataset(Dataset):
         
         if use_constrained_views:
             assert self.n_sources == 2, f'use_constrained_views cannot be used with only 2 sources per scene, but {self.n_sources} were requested'
-
+        
         self.seed = seed
         self.random = random.Random(seed)
         
-        assert split in ['train', 'val', 'test'], f'Invalid dataset split "{split}"'
+        assert split in ['train', 'val', 'test', 'test_new_category'], f'Invalid dataset split "{split}"'
         
-        if split == 'test':
+        if split == 'test_new_category':
             cpaths = [(test_category, os.path.join(path, test_category))]
         else:
-            cpaths = [(c, os.path.join(path, c)) for c in os.listdir(path)]
+            cpaths = [(c, os.path.join(path, c)) for c in os.listdir(path) if c != test_category]
             cpaths = [(c, cpath) for c, cpath in cpaths if os.path.isdir(cpath)]
         
-        spaths = [(f'{c}_{s}', os.path.join(cpath, 'scenes', s)) for c, cpath in cpaths for s in os.listdir(os.path.join(cpath, 'scenes'))]
-        spaths = [(sname, spath) for sname, spath in spaths if os.path.isdir(spath)]
+        cpaths.sort()
+        # cpaths = [i for i in cpaths if i[0] != 'pineapple'] # TODO
         
+        spaths = []
+        for c, cpath in cpaths:
+            scenes = os.listdir(os.path.join(cpath, 'scenes'))
+            scenes.sort()
+            self.random.shuffle(scenes)
+            
+            s_val_split = max(1, round(len(scenes) * val_split))
+            s_test_split = max(1, round(len(scenes) * test_split))
+            
+            if split == 'train':
+                scenes = scenes[s_test_split + s_val_split:]
+            elif split == 'val':
+                scenes = scenes[s_test_split:s_test_split + s_val_split]
+            elif split == 'test':
+                scenes = scenes[:s_test_split]
+            
+            spaths.extend([(f'{c}_{s}', os.path.join(cpath, 'scenes', s)) for s in scenes])
+        
+        spaths = [(sname, spath) for sname, spath in spaths if os.path.isdir(spath)]
         self.random.shuffle(spaths)
-        if split == 'train':
-            spaths = spaths[train_val_split_index:]
-        elif split == 'val':
-            spaths = spaths[:train_val_split_index]
         
         spaths = [
             (
                 f'{sname}',
                 spath,
                 # Only uses cone 0 for val and test
-                [os.path.join(spath, 'cones', c) for c in (os.listdir(os.path.join(spath, 'cones')) if split == 'train' else ['0']) if os.path.isdir(os.path.join(spath, 'cones', c))]
+                [os.path.join(spath, 'cones', c) for c in sorted(os.listdir(os.path.join(spath, 'cones')) if split == 'train' else ['0']) if os.path.isdir(os.path.join(spath, 'cones', c))]
             )
             for (sname, spath) in spaths
         ]
         
-        if use_constrained_views:
-            spaths = [(f'{sname}_{os.path.split(cpath)[1]}', spath, cpath) for sname, spath, cpaths in self.spaths for cpath in cpaths]
-        
-        self.random.shuffle(spaths)
         self.spaths = spaths
-
+    
     def __len__(self):
         return len(self.spaths)
     
     def get_image(self, path, is_depth):
-        img = cv2.imread(path)
+        img = cv2.imread(path, cv2.IMREAD_UNCHANGED) if is_depth else cv2.imread(path)
         
-        original_dim = (img.shape[-3], img.shape[-2])
+        original_dim = (img.shape[0], img.shape[1])
         
-        ar = img.shape[-3] / img.shape[-2]
-        out_ar = self.output_dims[-2] / self.output_dims[-1]
+        ar = img.shape[0] / img.shape[1]
+        out_ar = self.output_dims[0] / self.output_dims[1]
         if out_ar > ar:
-            new_dim = self.output_dims[-2] / ar
-            new_dim = max(self.output_dims[-1], round(new_dim))
-            new_shape = (self.output_dims[-2], new_dim)
+            new_dim = self.output_dims[0] / ar
+            new_dim = max(self.output_dims[1], round(new_dim))
+            new_shape = (self.output_dims[0], new_dim)
         else:
-            new_dim = self.output_dims[-1] * ar
-            new_dim = max(self.output_dims[-2], round(new_dim))
-            new_shape = (new_dim, self.output_dims[-1])
+            new_dim = self.output_dims[1] * ar
+            new_dim = max(self.output_dims[0], round(new_dim))
+            new_shape = (new_dim, self.output_dims[1])
         
         if is_depth:
             img = cv2.resize(img, new_shape, interpolation=cv2.INTER_NEAREST)
@@ -84,13 +95,13 @@ class WildRGBDDataset(Dataset):
             img = cv2.resize(img, new_shape, interpolation=cv2.INTER_LANCZOS4)
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         
-        resize_ratio = (img.shape[-3] / original_dim[0], img.shape[-2] / original_dim[1])
-        before_crop_dim = img.shape[-3:-1]
+        resize_ratio = (img.shape[0] / original_dim[0], img.shape[1] / original_dim[1])
+        before_crop_dim = img.shape[:2]
         
         img = torch.from_numpy(img)
         img = einx.id('h w c -> c h w', img)
         img = VF.center_crop(img, output_size=self.output_dims)
-        new_center_displacement = (img.shape[-3] / 2 - before_crop_dim[-3] / 2, img.shape[-2] / 2 - before_crop_dim[-2] / 2)
+        new_center_displacement = (img.shape[0] / 2 - before_crop_dim[0] / 2, img.shape[1] / 2 - before_crop_dim[1] / 2)
         
         return img, resize_ratio, original_dim, new_center_displacement
     
@@ -102,17 +113,17 @@ class WildRGBDDataset(Dataset):
             return f.read().strip().split('\n')
     
     def __getitem__(self, i):
-        self.random.seed(self.seed + i)
-        if self.use_constrained_views:
-            sname, spath, cpath = self.spaths[i]
-        else:
-            sname, spath, cpaths = self.spaths[i]
+        # DDP or FSDP with seed will already always lead to the same sequence so this is not needed also bc this does not take epoch into account
+        # self.random.seed(self.seed + i)
+        sname, spath, cpaths = self.spaths[i]
         
         with open(os.path.join(spath, 'metadata'), 'r', encoding='utf8') as f:
             data = edict(json.load(f))
             K = torch.tensor(data.K).reshape(3, 3).T
         
         if self.use_constrained_views:
+            cpath = self.random.choice(cpaths)
+            
             images, depths = [sorted(self.get_image_paths(cpath, t)) for t in ('rgb', 'depth')]
             pose_strs = self.get_cam_pose_strs(cpath)
             
@@ -136,9 +147,8 @@ class WildRGBDDataset(Dataset):
         
         c2ws = torch.stack([torch.tensor([float(i) for i in l.strip().split()[1:]]).reshape(4, 4) for l in pose_strs])
         R, t = c2ws[..., :3, :3], c2ws[..., :3, 3]
-        
         (images, resize_ratios, image_dims, center_displacements), (depths, _, depth_dims, _) = [
-            [list(i) for i in zip(self.get_image(path, is_depth) for path in paths)]
+            [list(i) for i in zip(*(self.get_image(path, is_depth) for path in paths))]
             for paths, is_depth in ((images, False), (depths, True))
         ]
         assert image_dims == depth_dims, f'Inconsistency between image sizes and depth sizes in dataset in scene "{spath}"'
@@ -152,9 +162,9 @@ class WildRGBDDataset(Dataset):
         depths = depths / 1000.0 # convert from mm to m
         
         # Batching and normalizing intrinsic matrices
-        K = einx.id('m n -> b m n', K, b=images.shape[0])
-        K[:, 0, :] = resize_ratios[:, 1] * K[:, 0, :]
-        K[:, 1, :] = resize_ratios[:, 0] * K[:, 1, :]
+        K = einx.id('m n -> b m n', K, b=images.shape[0]).clone()
+        K[:, 0, :] = resize_ratios[:, 1, None] * K[:, 0, :]
+        K[:, 1, :] = resize_ratios[:, 0, None] * K[:, 1, :]
         K[:, 0, 2] = K[:, 0, 2] + center_displacements[:, 1]
         K[:, 1, 2] = K[:, 1, 2] + center_displacements[:, 0]
         

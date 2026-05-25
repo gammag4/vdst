@@ -30,8 +30,8 @@ class DistributedTrainer(ABC):
         self.n_real_steps = self.config.train.n_real_steps if self.config.train.n_real_steps else self.n_steps
         
         self.last_grad_norms = torch.tensor([], dtype=torch.float32)
-        self.train_data = None
-        self.val_data = None
+        self.train_dataloader = None
+        self.val_dataloader = None
         self.loss_scheduler = None
         self.lr_scheduler = None
         self.optimizer = None
@@ -60,7 +60,7 @@ class DistributedTrainer(ABC):
             # Shuffle should be defined in sampler when using DistributedSampler
             shuffle=False,
             # Sampler that sends different batches to different gpus
-            sampler=DistributedSampler(dataset, shuffle=config.shuffle if train_dataloader else False),
+            sampler=DistributedSampler(dataset, shuffle=config.shuffle if train_dataloader else False, seed=self.config.setup.seed),
             num_workers=config.num_workers,
             prefetch_factor=config.prefetch_factor,
             persistent_workers=True,
@@ -70,8 +70,8 @@ class DistributedTrainer(ABC):
 
     def state_dict(self):
         state_dict = {
-            'train_data': self.train_data.state_dict(),
-            'val_data': None if self.val_data is None else self.val_data.state_dict(),
+            'train_dataloader': self.train_dataloader.state_dict(),
+            'val_dataloader': None if self.val_dataloader is None else self.val_dataloader.state_dict(),
             'loss_scheduler': None if self.loss_scheduler is None else self.loss_scheduler.state_dict(),
             'lr_scheduler': self.lr_scheduler.state_dict(),
             'optimizer': self.optimizer.state_dict(),
@@ -86,8 +86,8 @@ class DistributedTrainer(ABC):
         return state_dict
 
     def load_state_dict(self, state_dict):
-        self.train_data.load_state_dict(state_dict['train_data'])
-        self.val_data.load_state_dict(state_dict['val_data'])
+        self.train_dataloader.load_state_dict(state_dict['train_dataloader'])
+        self.val_dataloader.load_state_dict(state_dict['val_dataloader'])
         if state_dict['loss_scheduler'] is not None:
             self.loss_scheduler.load_state_dict(state_dict['loss_scheduler'])
         self.lr_scheduler.load_state_dict(state_dict['lr_scheduler'])
@@ -264,11 +264,11 @@ class DistributedTrainer(ABC):
     def _val(self):
         self.model.eval()
 
-        self.val_data.sampler.set_epoch(0)
+        self.val_dataloader.sampler.set_epoch(0)
 
         with amp.autocast(device_type=self.device, dtype=self.amp_config.dtype, enabled=self.amp_config.enabled), torch.no_grad():
             if self.is_main_process:
-                self._run_eval(iter(self.val_data))
+                self._run_eval(iter(self.val_dataloader))
 
         self.model.train()
 
@@ -300,8 +300,9 @@ class DistributedTrainer(ABC):
     def _train(self):
         # Setting sampler epoch at beginning of each epoch before creating DataLoader iterator is necessary for shuffling to work in distributed mode across multiple epochs
         # See: https://docs.pytorch.org/docs/stable/data.html
-        self.train_data.sampler.set_epoch(self.current_epoch)
-        it = iter(self.train_data)
+        self.train_dataloader.sampler.set_epoch(self.current_epoch)
+        self.train_dataloader.dataset.current_epoch = self.current_epoch
+        it = iter(self.train_dataloader)
 
         self.logger.start()
         
@@ -309,11 +310,11 @@ class DistributedTrainer(ABC):
             try:
                 batch = next(it)
             except StopIteration:
-                it = iter(self.train_data)
+                it = iter(self.train_dataloader)
                 batch = next(it)
                 self.current_epoch += 1
                 self.current_epoch_step = 0
-                self.train_data.sampler.set_epoch(self.current_epoch)
+                self.train_dataloader.sampler.set_epoch(self.current_epoch)
             
             self.logger.log({'info/step': {
                 'step': self.logger.current_step, # TODO refactor
@@ -333,8 +334,8 @@ class DistributedTrainer(ABC):
     async def run(self):
         training_args = self._init_training()
         
-        self.train_data = self._create_dataloader(training_args.train_dataset, train_dataloader=True)
-        self.val_data = self._create_dataloader(training_args.val_dataset, train_dataloader=False)
+        self.train_dataloader = self._create_dataloader(training_args.train_dataset, train_dataloader=True)
+        self.val_dataloader = self._create_dataloader(training_args.val_dataset, train_dataloader=False)
         self.loss_scheduler = training_args.loss_scheduler
         self.optimizer = training_args.optimizer
         self.lr_scheduler = training_args.lr_scheduler

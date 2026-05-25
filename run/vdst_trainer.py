@@ -67,7 +67,6 @@ class VDSTTrainer(DistributedTrainer):
             )
             for split in ('train', 'val', 'test', 'test_new_category')
         ]
-        self.train_dataset = train_dataset
         
         return train_dataset, val_dataset
     
@@ -198,7 +197,7 @@ class VDSTTrainer(DistributedTrainer):
             for j in range(self.intermediate_results_num_train_batches):
                 train_batch = []
                 for i in range(j * self.config.train.data.train_batch_size, (j + 1) * self.config.train.data.train_batch_size):
-                    train_batch.append(self.train_data.dataset[i])
+                    train_batch.append(self.train_dataloader.dataset[i])
                 
                 sources, targets = [edict({k: torch.stack([i[p][k] for i in train_batch]) for k in train_batch[0][p].keys()}) for p in ('sources', 'targets')]
                 train_batch = edict(

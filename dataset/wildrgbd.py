@@ -18,6 +18,7 @@ class WildRGBDDataset(Dataset):
         self.n_targets = n_targets
         self.output_dims = output_dims
         self.use_constrained_views = use_constrained_views
+        self.current_epoch = 0
         
         if use_constrained_views:
             assert self.n_sources == 2, f'use_constrained_views cannot be used with only 2 sources per scene, but {self.n_sources} were requested'
@@ -113,8 +114,7 @@ class WildRGBDDataset(Dataset):
             return f.read().strip().split('\n')
     
     def __getitem__(self, i):
-        # DDP or FSDP with seed will already always lead to the same sequence so this is not needed also bc this does not take epoch into account
-        # self.random.seed(self.seed + i)
+        self.random.seed(self.seed + i + len(self) * self.current_epoch)
         sname, spath, cpaths = self.spaths[i]
         
         with open(os.path.join(spath, 'metadata'), 'r', encoding='utf8') as f:

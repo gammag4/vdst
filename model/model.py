@@ -57,6 +57,21 @@ class VDST(nn.Module):
         
         self.loss = loss
     
+    def state_dict(self):
+        # doesnt need to store loss weights since it is not learned
+        state_dict = super().state_dict()
+        state_dict = {k: v for k, v in state_dict.items() if not k.startswith('loss.')}
+        
+        return state_dict
+    
+    def load_state_dict(self, state_dict):
+        # doesnt need to store loss weights since it is not learned
+        current_state_dict = {k: v for k, v in super().state_dict().items() if k.startswith('loss.')}
+        state_dict = {k: v for k, v in state_dict.items() if not k.startswith('loss.')}
+        state_dict = {**state_dict, **current_state_dict}
+        
+        return super().load_state_dict(state_dict)
+    
     def normalize_sources(self, images, depths):
         eps = 1e-8
         

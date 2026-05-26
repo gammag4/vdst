@@ -26,7 +26,7 @@ class Logger(ABC):
             self.current_step += 1
     
     def start(self):
-        pass
+        return None
     
     def end(self):
         pass
@@ -108,7 +108,7 @@ class WandbLogger(PrintLogger):
         self.logger_config = logger_config
         self.config = config
     
-    def start(self):
+    def start(self, run_id=None):
         group_msg = f' - {self.logger_config.run_group_name}' if self.logger_config.run_group_name is not None else ''
         self.message(f'Starting run "{self.logger_config.project_name}{group_msg} - {self.logger_config.run_name}"\n')
         
@@ -116,8 +116,12 @@ class WandbLogger(PrintLogger):
             project=self.logger_config.project_name,
             group=self.logger_config.run_group_name,
             name=self.logger_config.run_name,
+            id=run_id,
+            resume=None if run_id is None else 'must',
             config=self.config
         )
+        
+        return wandb.run.id
     
     def _log_vars(self, vars):
         wandb.log(vars, step=self.current_step)

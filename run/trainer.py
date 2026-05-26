@@ -41,6 +41,7 @@ class DistributedTrainer(ABC):
         self.timer = None
         self.current_epoch = 0
         self.current_epoch_step = 0
+        self.run_id = None
     
     @property
     def is_last(self):
@@ -81,6 +82,7 @@ class DistributedTrainer(ABC):
             'last_grad_norms': self.last_grad_norms,
             'current_epoch': self.current_epoch,
             'current_epoch_step': self.current_epoch_step,
+            'run_id': self.run_id,
         }
 
         return state_dict
@@ -98,6 +100,7 @@ class DistributedTrainer(ABC):
         self.last_grad_norms = state_dict['last_grad_norms']
         self.current_epoch = state_dict['current_epoch']
         self.current_epoch_step = state_dict['current_epoch_step']
+        self.run_id = state_dict['run_id']
 
     def _get_last_checkpoint_path(self, path):
         os.makedirs(path, exist_ok=True)
@@ -304,7 +307,7 @@ class DistributedTrainer(ABC):
         self.train_dataloader.dataset.current_epoch = self.current_epoch
         it = iter(self.train_dataloader)
 
-        self.logger.start()
+        self.run_id = self.logger.start(self.run_id)
         
         for _ in range(self.logger.current_step, self.n_real_steps):
             try:

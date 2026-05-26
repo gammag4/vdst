@@ -2,6 +2,8 @@ import os
 import asyncio
 import argparse
 from dotenv import load_dotenv
+import torch
+import gc
 
 from utils.config import load_config, load_experiments_config
 from run.runner import run_distributed
@@ -48,6 +50,8 @@ async def main():
                 f.write(f'{config.train.logger.run_group_name}\n{config.train.logger.run_name}')
             
             await run_experiment(config, config_raw)
+            gc.collect()
+            torch.cuda.empty_cache()
         
         with open(experiments_checkpoint_path, 'w', encoding='utf8') as f:
             f.write('ended')

@@ -101,6 +101,21 @@ def load_experiments_config(path, experiments_path, cli_args):
     global_config = OmegaConf.merge(global_config, extra_config)
 
     setup_config = parse_omega_config(experiments_config['setup'])
+    
+    seed_model_config = None
+    if setup_config.use_seed_model:
+        group_name, name = 'seed models', 'seed model'
+        config = parse_omega_config(global_config)
+
+        config.train.logger.run_group_name = group_name
+        config.train.logger.run_name = name
+        config.train.checkpoints.path = os.path.join(setup_config.out_path, name)
+        config.train.n_real_steps = setup_config.seed_model_steps
+
+        config_raw = edict_to_dict(config)
+        config = process_config(config)
+
+        seed_model_config = (config, config_raw)
 
     experiments = []
     for k, v in experiments_config['experiments'].items():
@@ -121,4 +136,4 @@ def load_experiments_config(path, experiments_path, cli_args):
 
             experiments.append((config, config_raw))
 
-    return experiments, setup_config
+    return experiments, setup_config, seed_model_config

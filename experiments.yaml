@@ -20,7 +20,9 @@ overrides:
 
 setup:
   out_path: results/experiments/
-  total_experiment_steps: 30000
+  total_experiment_steps: 20000
+  use_seed_model: true
+  seed_model_steps: 40000
 
 experiments:
   # spatial_pixel:

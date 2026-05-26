@@ -329,6 +329,7 @@ class DistributedTrainer(ABC):
             self._run_pass(batch)
         
         self.logger.end()
+        print()
     
     @abstractmethod
     def _init_training(self):
@@ -360,6 +361,12 @@ class DistributedTrainer(ABC):
         # When using torchrun, we need load and save checkpoint logic because when any of the processes fail, torchrun restarts all of them at the last existing checkpoint
         # Starts from checkpoint if exists
         self._try_load_checkpoint()
+        
+        # Already ran
+        if self.is_last:
+            run = f'{self.config.train.logger.project_name} - {self.config.train.logger.run_group_name} - {self.config.train.logger.run_name}'
+            print(f'Already ran "{run}", skipping...\n')
+            return
         
         if self.is_main_process:
             # TODO log to wandb

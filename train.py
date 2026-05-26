@@ -33,29 +33,14 @@ async def main():
         experiments, setup_config, seed_model_config = load_experiments_config(args.config, args.experiments, args.other)
         
         os.makedirs(setup_config.out_path, exist_ok=True)
-        experiments_checkpoint_path = os.path.join(setup_config.out_path, 'checkpoint.txt')
         
-        try:
-            with open(experiments_checkpoint_path, 'r', encoding='utf8') as f:
-                res = f.read()
-                if res == 'ended':
-                    print('Experiments already ran.')
-                    return
-                run_group_name, run_name = res.split('\n')[:2]
-                start_experiment_id = [e.train.logger.run_group_name == run_group_name and e.train.logger.run_name == run_name for e, c in experiments].index(True)
-        except FileNotFoundError:
-            start_experiment_id = 0
-            
         if seed_model_config is not None:
             config, config_raw = seed_model_config
             await run_experiment(config, config_raw)
         
         print('Running experiments ...\n')
         
-        for config, config_raw in experiments[start_experiment_id:]:
-            with open(experiments_checkpoint_path, 'w', encoding='utf8') as f:
-                f.write(f'{config.train.logger.run_group_name}\n{config.train.logger.run_name}')
-
+        for config, config_raw in experiments:
             if seed_model_config is not None:
                 seed_model_path, path = [os.path.join(i.train.checkpoints.path, 'checkpoints') for i in (seed_model_config[0], config)]
                 last_seed_model_checkpoint = os.path.join(seed_model_path, sorted(os.listdir(seed_model_path), key=lambda x: int(x.split('.')[0]))[-1])
@@ -64,9 +49,6 @@ async def main():
                 shutil.copy(last_seed_model_checkpoint, checkpoint_destination)
             
             await run_experiment(config, config_raw)
-        
-        with open(experiments_checkpoint_path, 'w', encoding='utf8') as f:
-            f.write('ended')
         
         print('\nExperiments ended.')
     else:

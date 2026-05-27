@@ -20,9 +20,11 @@ This type of Transformer-based architecture for Novel View Synthesis is not new 
 In our case, the model architecture and philosophy was inspired primarily on [LVSM](https://haian-jin.github.io/projects/LVSM/),
 though there are other similar architectures as well, with [SRT](https://srt-paper.github.io/) being another relevant example.
 
-This model has two main advantages in comparison to other methods:
+These are the main advantages this model has in comparison to other methods:
 
-- Due to the generalization ability of Transformer-based models across domains, it is capable of generalizing to novel scenes that follow a similar distribution to the original training data;
+- Due to the generalization ability of Transformer-based models across domains, it is capable of:
+  - Generalizing to novel scenes that follow a similar distribution to the original training data;
+  - Doing few-shot NVS, needing only two source images or even just a single one in most cases for generating new views;
 - Following the same philosophy as LVSM, our architecture also tries to minimize the inductive bias of the model,
   and we hypothesize that this allows it to achieve better results than other methods when trained for longer periods with sufficiently large amounts of data,
   although we do not have enough computational resources to verify this, leaving it for future work;

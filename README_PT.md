@@ -20,9 +20,11 @@ Esse tipo de arquitetura baseada em Transformer para Novel View Synthesis não �
 No nosso caso, a arquitetura e filosofia do modelo foi inspirada principalmente no [LVSM](https://haian-jin.github.io/projects/LVSM/),
 embora existam outras arquiteturas similares também, sendo [SRT](https://srt-paper.github.io/) outro exemplo relevante.
 
-Esse modelo possui duas vantagens principais em comparação com outros métodos:
+Essas são as vantagens principais que esse modelo tem em comparação com outros métodos:
 
-- Devido à capacidade de generalização entre domínios de modelos baseados em Transformer, ele é capaz de generalizar para cenas novas que seguem uma distribuição similar à dos dados originais de treino;
+- Devido à capacidade de generalização entre domínios de modelos baseados em Transformer, ele é capaz de:
+  - Generalizar para cenas novas que seguem uma distribuição similar à dos dados originais de treino;
+  - Realizar few-shot NVS, precisando de apenas duas imagens-fonte ou às vezes apenas uma na maioria dos casos para gerar novas visões;
 - Seguindo a mesma filosofia do LVSM, nossa arquitetura também tenta minimizar o viés indutivo do modelo,
   e hipotetizamos que isso permite alcançar melhor resultados do que outros métodos quando treinado por períodos mais longos com quantidades suficientemente grandes de dados,
   apesar de não termos recursos computacionais suficientes para verificar isso, deixando tal investigação como trabalho futuro;

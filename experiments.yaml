@@ -63,31 +63,6 @@ experiments:
   #         output_dims: [64, 64]
   #         train_batch_size: 8
   #         val_batch_size: 8
-  isolated losses:
-    regular:
-      train:
-        loss:
-          weights: [2.0,2.0,0.7,1.5,1.0]
-    without i mse:
-      train:
-        loss:
-          weights: [0.0,2.0,0.7,1.5,1.0]
-    without i percep:
-      train:
-        loss:
-          weights: [2.0,0.0,0.7,1.5,1.0]
-    without d silog:
-      train:
-        loss:
-          weights: [2.0,2.0,0.0,1.5,1.0]
-    without d mscale grad:
-      train:
-        loss:
-          weights: [2.0,2.0,0.7,0.0,1.0]
-    without d percep:
-      train:
-        loss:
-          weights: [2.0,2.0,0.7,0.0,1.0]
 
 old_experiments:
   lr:
@@ -136,3 +111,28 @@ old_experiments:
     without d mask:
       model:
         has_input_depth_masks: false
+  isolated losses:
+    regular:
+      train:
+        loss:
+          weights: [2.0,2.0,0.7,1.5,1.0]
+    without i mse:
+      train:
+        loss:
+          weights: [0.0,2.0,0.7,1.5,1.0]
+    without i percep:
+      train:
+        loss:
+          weights: [2.0,0.0,0.7,1.5,1.0]
+    without d silog:
+      train:
+        loss:
+          weights: [2.0,2.0,0.0,1.5,1.0]
+    without d mscale grad:
+      train:
+        loss:
+          weights: [2.0,2.0,0.7,0.0,1.0]
+    without d percep:
+      train:
+        loss:
+          weights: [2.0,2.0,0.7,1.0,0.0]

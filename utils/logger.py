@@ -1,32 +1,41 @@
 from abc import ABC, abstractmethod
 from pprint import pprint
 import wandb
+from easydict import EasyDict as edict
 
 
 class Logger(ABC):
     def __init__(self, is_main_process):
         self.is_main_process = is_main_process
-        self.current_step = 0
+        self.step = 0
         self.iteration_vars = {}
         self.global_vars = {}
     
     @property
     def vars(self):
         return {**self.global_vars, **self.iteration_vars}
-
+    
     @abstractmethod
     def _log_vars(self, vars):
         pass
-
+    
+    def start_step(self, step):
+        if self.is_main_process:
+            self.step = step
+    
     # Should be called after every pass
-    def update(self):
+    def end_step(self):
         if self.is_main_process:
             self._log_vars(self.vars)
             self.iteration_vars = {}
-            self.current_step += 1
     
-    def start(self):
+    @abstractmethod
+    def _start(self, vars):
         return None
+    
+    def start(self, **vars):
+        if self.is_main_process:
+            self._start(edict(vars))
     
     def end(self):
         pass
@@ -36,8 +45,12 @@ class Logger(ABC):
             self.iteration_vars = {**self.iteration_vars, **vars}
     
     @abstractmethod
-    def log_image(self, path, name):
+    def _log_image(self, path, name):
         pass
+    
+    def log_image(self, path, name):
+        if self.is_main_process:
+            self._log_image(path, name)
     
     def log_global(self, vars: dict):
         if self.is_main_process:
@@ -50,24 +63,24 @@ class Logger(ABC):
     def message(self, msg):
         if self.is_main_process:
             self._display_message(msg)
-
+    
     @abstractmethod
     def _display_vars(self, vars):
         pass
-
+    
     def display_current(self):
         if self.is_main_process:
             self._display_vars(self.vars)
     
     def state_dict(self):
         return {
-            'iteration': self.current_step,
+            'step': self.step,
             'iteration_vars': self.iteration_vars,
             'global_vars': self.global_vars
         }
     
     def load_state_dict(self, state_dict):
-        self.current_step = state_dict['iteration']
+        self.step = state_dict['step']
         self.iteration_vars = state_dict['iteration_vars']
         self.global_vars = state_dict['global_vars']
 
@@ -84,18 +97,18 @@ class StandardLogger(PrintLogger):
     def __init__(self, is_main_process):
         super().__init__(is_main_process)
         self.logs = []
-
+    
     def _log_vars(self, vars):
         self.logs.append(vars)
     
-    def log_image(self, path, name):
+    def _log_image(self, path, name):
         raise Exception('Cant log images')
-
+    
     def state_dict(self):
         state_dict = super().state_dict()
         state_dict['logs'] = self.logs
         return state_dict
-
+    
     def load_state_dict(self, state_dict):
         super().load_state_dict(state_dict)
         self.logs = state_dict['logs']
@@ -108,7 +121,7 @@ class WandbLogger(PrintLogger):
         self.logger_config = logger_config
         self.config = config
     
-    def start(self, run_id=None):
+    def _start(self, vars):
         group_msg = f' - {self.logger_config.run_group_name}' if self.logger_config.run_group_name is not None else ''
         self.message(f'Starting run "{self.logger_config.project_name}{group_msg} - {self.logger_config.run_name}"\n')
         
@@ -116,18 +129,18 @@ class WandbLogger(PrintLogger):
             project=self.logger_config.project_name,
             group=self.logger_config.run_group_name,
             name=self.logger_config.run_name,
-            id=run_id,
-            resume=None if run_id is None else 'must',
+            id=vars.run_id,
+            resume=None if vars.run_id is None else 'must',
             config=self.config
         )
         
         return wandb.run.id
     
     def _log_vars(self, vars):
-        wandb.log(vars, step=self.current_step)
+        wandb.log(vars, step=self.step)
     
-    def log_image(self, path, name):
-        wandb.log({name: wandb.Image(path, caption=name)}, step=self.current_step)
+    def _log_image(self, path, name):
+        wandb.log({name: wandb.Image(path, caption=name)}, step=self.step)
     
     def end(self):
         wandb.finish()

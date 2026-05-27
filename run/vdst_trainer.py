@@ -129,7 +129,7 @@ class VDSTTrainer(DistributedTrainer):
     def _try_fit_power_law(self):
         pl_config = self.config.train.metric_power_law_fitting
 
-        if pl_config.should_fit and ((self.is_last and -1 in pl_config.instants) or self.logger.current_step in pl_config.instants):
+        if pl_config.should_fit and ((self.is_last and -1 in pl_config.instants) or self.current_step in pl_config.instants):
             start_step = self.config.train.optimizer.n_warmup_steps if pl_config.skip_warmup_steps else 0
             points = []  # TODO
             points = points[start_step:]
@@ -176,7 +176,7 @@ class VDSTTrainer(DistributedTrainer):
             f.write('\n'.join(batch_res.scene_name) + '\n')
     
     def _run_eval(self, data_iter):
-        path = os.path.join(self.config.train.checkpoints.path, 'intermediate_results', f'{self.logger.current_step}')
+        path = os.path.join(self.config.train.checkpoints.path, 'intermediate_results', f'{self.current_step}')
         os.makedirs(path, exist_ok=True)
         
         with open(os.path.join(path, 'scenes.txt'), 'w', encoding='utf8') as f:

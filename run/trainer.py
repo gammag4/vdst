@@ -19,7 +19,7 @@ class DistributedTrainer(ABC):
     def __init__(self, config, config_raw):
         self.config = config
         self.config_raw = config_raw
-
+        
         self.device = config.setup.distributed.device
         self.local_rank = config.setup.distributed.local_rank
         self.rank = config.setup.distributed.rank
@@ -39,21 +39,22 @@ class DistributedTrainer(ABC):
         self.model = None
         self.logger = None
         self.timer = None
+        self.current_step = 0
         self.current_epoch = 0
         self.current_epoch_step = 0
         self.run_id = None
     
     @property
     def is_last(self):
-        return self.logger.current_step == self.n_real_steps - 1
+        return self.current_step == self.n_real_steps - 1
     
     @property
     def is_main_process(self):
         return self.rank == 0
-
+    
     def _create_dataloader(self, dataset: Dataset, train_dataloader=True):
         config = self.config.train.data
-
+        
         # TODO check if this loader works with ddp. seems to work, but needs to check with multiple gpus
         return StatefulDataLoader(
             dataset,
@@ -68,7 +69,7 @@ class DistributedTrainer(ABC):
             pin_memory=config.pin_memory,
             drop_last=False,
         )
-
+    
     def state_dict(self):
         state_dict = {
             'train_dataloader': self.train_dataloader.state_dict(),
@@ -80,13 +81,14 @@ class DistributedTrainer(ABC):
             'logger': self.logger.state_dict(),
             'timer': self.timer.state_dict(),
             'last_grad_norms': self.last_grad_norms,
+            'current_step': self.current_step,
             'current_epoch': self.current_epoch,
             'current_epoch_step': self.current_epoch_step,
             'run_id': self.run_id,
         }
-
+        
         return state_dict
-
+    
     def load_state_dict(self, state_dict):
         self.train_dataloader.load_state_dict(state_dict['train_dataloader'])
         self.val_dataloader.load_state_dict(state_dict['val_dataloader'])
@@ -98,13 +100,14 @@ class DistributedTrainer(ABC):
         self.logger.load_state_dict(state_dict['logger'])
         self.timer.load_state_dict(state_dict['timer'])
         self.last_grad_norms = state_dict['last_grad_norms']
+        self.current_step = state_dict['current_step']
         self.current_epoch = state_dict['current_epoch']
         self.current_epoch_step = state_dict['current_epoch_step']
         self.run_id = state_dict['run_id']
-
+    
     def _get_last_checkpoint_path(self, path):
         os.makedirs(path, exist_ok=True)
-
+        
         checkpoints = os.listdir(path)
         
         if len(checkpoints) == 0:
@@ -132,23 +135,21 @@ class DistributedTrainer(ABC):
             # This prevents processes from using others' devices (when set to accelerator:local_rank)
             self.load_state_dict(torch.load(train_checkpoint_path, map_location='cpu', weights_only=config.weights_only))
             self.logger.message(f'Resumed training with training data from {train_checkpoint_path}')
-
+    
     def _try_save_checkpoint(self):
         config = self.config.train.checkpoints
         
-        current_step = self.logger.current_step - 1 # Runs after updating step
-        
         # Ensures only saves from first GPU to prevent redundancy
-        if not self.is_last and (current_step == 0 or not self.is_main_process or current_step % self.config.train.checkpoints.checkpoint_steps_interval != 0):
+        if not self.is_last and (self.current_step == 0 or not self.is_main_process or self.current_step % self.config.train.checkpoints.checkpoint_steps_interval != 0):
             return
         
         torch.accelerator.synchronize(self.device)
-
-        model_checkpoint_path = os.path.join(config.path, 'checkpoints', f'{current_step}.pt')
+        
+        model_checkpoint_path = os.path.join(config.path, 'checkpoints', f'{self.current_step}.pt')
         torch.save(self.model.module.state_dict(), model_checkpoint_path)
         self.logger.message(f'Saved trained model at {model_checkpoint_path}')
-
-        train_checkpoint_path = os.path.join(config.path, 'train_checkpoints', f'{current_step}.pt')
+        
+        train_checkpoint_path = os.path.join(config.path, 'train_checkpoints', f'{self.current_step}.pt')
         torch.save(self.state_dict(), train_checkpoint_path)
         self.logger.message(f'Saved training data at {train_checkpoint_path}')
     
@@ -183,7 +184,7 @@ class DistributedTrainer(ABC):
         grad_norm = grad_norm.cpu()
         self.last_grad_norms = torch.concat([self.last_grad_norms, grad_norm.reshape(-1)])
         grad_norm = grad_norm.item()
-
+        
         should_skip_step = grad_norm > grad_skip_norm
         clipped = grad_norm > grad_clip_norm
         
@@ -203,43 +204,43 @@ class DistributedTrainer(ABC):
         }})
         
         return should_skip_step
-
+    
     # Use this function to run a batch for a generic model
     def _run_pass_once(self, batch):
         self.optimizer.zero_grad(set_to_none=True)
-
+        
         # AMP: Casts operations to mixed precision
         with amp.autocast(device_type=self.device, dtype=self.amp_config.dtype, enabled=self.amp_config.enabled):
             # output.dtype is bfloat16 because linear layers autocast to bfloat16
             # loss.dtype is float32 because mse_loss layers autocast to float32
             loss = self._run_forward(batch)
-
+        
         # Exits autocast before backward()
         # Backward passes under autocast are not recommended
         # Backward ops run in the same dtype autocast chose for corresponding forward ops
-
+        
         # Scales the loss, and calls backward()
         # to create scaled gradients
         self.grad_scaler.scale(loss).backward()  # Already called in model
-
+        
         # All gradients are scaled in this region up to scaler.step(optimizer), so they need to be unscaled to be used
         # Unscales the gradients of optimizer's assigned params in-place
         self.grad_scaler.unscale_(self.optimizer)
-
+        
         # Gradient clipping/skipping
         should_skip_step = self._try_grad_clip_skip()
-
+        
         # Unscales gradients (if not unscaled before) and calls or skips optimizer.step()
         # It skips if there are infs or NaNs in grads
         # Since we called unscale_ before, it will not unscale gradients again
         if not should_skip_step:
             self.grad_scaler.step(self.optimizer)
-
+        
         # Updates the scale for next iteration
         self.grad_scaler.update()
-
+        
         self.logger.log({'metrics/loss': loss.detach().item()})
-
+    
     # This method is run after each pass to update stuff
     def _step(self):
         self.timer.update()
@@ -258,45 +259,52 @@ class DistributedTrainer(ABC):
         
         if self.lr_scheduler is not None:
             self.lr_scheduler.step()
-
+    
     # Eval step
     @abstractmethod
     def _run_eval(self, data_iter):
         pass
-
+    
     def _val(self):
         self.model.eval()
-
+        
         self.val_dataloader.sampler.set_epoch(0)
-
+        
         with amp.autocast(device_type=self.device, dtype=self.amp_config.dtype, enabled=self.amp_config.enabled), torch.no_grad():
             if self.is_main_process:
                 self._run_eval(iter(self.val_dataloader))
-
+        
         self.model.train()
-
+    
     # Stuff to run after step
     def _after_step(self):
         pass
     
     # Use this method to run one forward/backward pass for a generic model
     def _run_pass(self, batch):
+        self.logger.start_step(self.current_step)
+        
+        self.logger.log({'info/step': {
+            'step': self.current_step,
+            'epoch': self.current_epoch,
+            'epoch_step': self.current_epoch_step,
+            'total_steps': self.n_real_steps
+        }})
+        
         self._run_pass_once(batch)
         
         self._step()
-
-        if self.is_last or self.logger.current_step % self.config.train.val_steps_interval == 0:
+        
+        if self.is_last or self.current_step % self.config.train.val_steps_interval == 0:
             self._val()
-
+        
         self._after_step()
         
-        if self.is_main_process and self.logger.current_step % self.config.train.display_log_steps_interval == 0:
+        if self.is_main_process and self.current_step % self.config.train.display_log_steps_interval == 0:
             torch.accelerator.synchronize(self.device)
             self.logger.display_current()
             print('')
-        self.logger.update()
-        
-        self.current_epoch_step += 1
+        self.logger.end_step()
         
         self._try_save_checkpoint()
     
@@ -306,10 +314,17 @@ class DistributedTrainer(ABC):
         self.train_dataloader.sampler.set_epoch(self.current_epoch)
         self.train_dataloader.dataset.current_epoch = self.current_epoch
         it = iter(self.train_dataloader)
-
-        self.run_id = self.logger.start(self.run_id)
         
-        for _ in range(self.logger.current_step, self.n_real_steps):
+        self.run_id = self.logger.start(run_id=self.run_id)
+        
+        if self.current_step == 0:
+            self.current_step = -1
+            self.current_epoch_step = -1
+        
+        for _ in range(self.current_step + 1, self.n_real_steps):
+            self.current_step += 1
+            self.current_epoch_step += 1
+            
             try:
                 batch = next(it)
             except StopIteration:
@@ -318,13 +333,6 @@ class DistributedTrainer(ABC):
                 self.current_epoch += 1
                 self.current_epoch_step = 0
                 self.train_dataloader.sampler.set_epoch(self.current_epoch)
-            
-            self.logger.log({'info/step': {
-                'step': self.logger.current_step, # TODO refactor
-                'epoch': self.current_epoch,
-                'epoch_step': self.current_epoch_step,
-                'total_steps': self.n_real_steps
-            }})
             
             self._run_pass(batch)
         

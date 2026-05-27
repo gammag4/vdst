@@ -136,3 +136,45 @@ old_experiments:
       train:
         loss:
           weights: [2.0,2.0,0.7,1.0,0.0]
+  percep loss architecture:
+    convnext:
+      train:
+        loss:
+          perceptual:
+            type: convnext
+            transforms: normalize_only
+    convnext def:
+      train:
+        loss:
+          perceptual:
+            type: convnext
+            transforms: default
+    convnext def no crop:
+      train:
+        loss:
+          perceptual:
+            type: convnext
+            transforms: default_no_crop
+    vgg:
+      train:
+        loss:
+          perceptual:
+            type: vgg
+            transforms: normalize_only
+    vgg def transf:
+      train:
+        loss:
+          perceptual:
+            type: vgg
+            transforms: default
+    vgg2:
+      train:
+        loss:
+          perceptual:
+            type: vgg2
+            transforms: default
+    # vgg3:
+    #   train:
+    #     loss:
+    #       perceptual:
+    #         type: vgg3

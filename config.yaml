@@ -125,6 +125,19 @@ train:
     perceptual:
       # Either 'constant' or 'falling_perceptual'
       scheduler: falling_perceptual
+      # Either 'default', 'default_no_crop' or 'normalize_only'
+      transforms: 'default_no_crop'
+      weights: null
+      # Either 'convnext', 'vgg', 'vgg2', 'vgg3'
+      type: convnext
+      # weights: [2.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+      # weights: [1.6, 1.0, 0.8, 0.7, 0.5, 0.5, 0.5, 0.5, 0.5)#, 0.2]
+      # type: vgg
+      # weights: [2.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+      # type: vgg2
+      # weights: [2.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+      # type: vgg3
+      # weights: [2.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
     # SILog loss config
     silog:
       # How much to penalize absolute scale errors

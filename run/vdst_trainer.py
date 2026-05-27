@@ -39,10 +39,14 @@ class VDSTTrainer(DistributedTrainer):
     def state_dict(self):
         state_dict = super().state_dict()
         state_dict['val_intermediate_results_steps'] = self.val_intermediate_results_steps
+        state_dict['use_entire_val_datset_steps'] = self.use_entire_val_datset_steps
+        
         return state_dict
     
     def load_state_dict(self, state_dict):
         self.val_intermediate_results_steps = state_dict['val_intermediate_results_steps']
+        self.use_entire_val_datset_steps = state_dict['use_entire_val_datset_steps']
+        
         return super().load_state_dict(state_dict)
     
     def _create_datasets(self, config):
@@ -183,13 +187,9 @@ class VDSTTrainer(DistributedTrainer):
             f.write('')
         
         should_save_intermediate_results = self.is_last or self.val_intermediate_results_steps % self.val_intermediate_results_interval == 0
-        if should_save_intermediate_results:
-            self.val_intermediate_results_steps = 0
         self.val_intermediate_results_steps += 1
         
         should_use_entire_val_dataset = self.is_last or self.use_entire_val_datset_steps % self.use_entire_val_datset_interval == 0
-        if should_use_entire_val_dataset:
-            self.use_entire_val_datset_steps = 0
         self.use_entire_val_datset_steps += 1
 
         # Always uses only number specified of batches for intermediate results of scenes used in training

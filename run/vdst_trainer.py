@@ -28,11 +28,11 @@ class VDSTTrainer(DistributedTrainer):
         
         # only saves results every 1/10th of the time that eval metrics are computed
         self.intermediate_results_num_batches = 1 # should be <= intermediate_val_num_batches
-        self.intermediate_results_interval = 10
+        self.intermediate_results_interval = 1
         
         # only evals entire dataset every 1/1th of the time that eval metrics are computed
         self.intermediate_val_num_batches = 1
-        self.use_entire_val_datset_interval = 2
+        self.use_entire_val_datset_interval = 1
         
         if self.is_main_process:
             self.eval_metrics = EvalMetrics().to(self.device)
@@ -50,7 +50,7 @@ class VDSTTrainer(DistributedTrainer):
     
     def _create_datasets(self, config):
         # Picking n scenes for validation
-        val_split = 0.01
+        val_split = 0.005
         test_split = 0.02
         
         # TODO val should use n scenes from each category

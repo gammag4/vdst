@@ -7,7 +7,6 @@ overrides:
     dec_residual_layer_norm: false
     standardize_inputs: false
   train:
-    val_steps_interval: 50
     n_steps: 500000
 
     loss:

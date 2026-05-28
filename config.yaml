@@ -45,7 +45,7 @@ train:
   # Display logs every n steps
   display_log_steps_interval: 10
   # Do evaluation and save results after every n steps
-  val_steps_interval: 50
+  val_steps_interval: 100
 
   # Power law fitting settings
   metric_power_law_fitting:

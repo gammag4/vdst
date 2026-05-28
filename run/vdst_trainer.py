@@ -53,22 +53,20 @@ class VDSTTrainer(DistributedTrainer):
         val_split = 0.005
         test_split = 0.02
         
-        # TODO val should use n scenes from each category
-        # TODO use test_dataset in inference to verify
-        train_dataset, val_dataset, test_dataset, test_new_category_dataset = [
+        train_dataset, val_dataset = [
             WildRGBDDataset(
                 config.datasets.wildrgbd.path,
                 config.n_sources,
                 config.n_targets,
                 output_dims=config.output_dims,
-                use_constrained_views=config.datasets.wildrgbd.use_constrained_views,
+                dataset_type=config.datasets.wildrgbd.dataset_type,
                 val_split=val_split,
                 test_split=test_split,
                 split=split,
                 test_category='truck',
                 seed=self.config.setup.seed
             )
-            for split in ('train', 'val', 'test', 'test_new_category')
+            for split in ('train', 'val')
         ]
         
         return train_dataset, val_dataset

@@ -177,3 +177,25 @@ old_experiments:
     #     loss:
     #       perceptual:
     #         type: vgg3
+  new dataset:
+    old:
+      train:
+        data:
+          datasets:
+            wildrgbd:
+              path: /media/gabriel/kingston 240gb/wildrgbd/
+              dataset_type: raw
+    new:
+      train:
+        data:
+          datasets:
+            wildrgbd:
+              path: /media/gabriel/sandisk_1tb/wildrgbd/
+              dataset_type: cones_unconstrained
+    new constrained views:
+      train:
+        data:
+          datasets:
+            wildrgbd:
+              path: /media/gabriel/sandisk_1tb/wildrgbd/
+              dataset_type: cones_constrained

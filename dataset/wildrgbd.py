@@ -12,16 +12,16 @@ import einx
 
 
 class WildRGBDDataset(Dataset):
-    def __init__(self, path, n_sources, n_targets, output_dims, use_constrained_views, val_split, test_split, split='train', test_category='truck', seed=42):
+    def __init__(self, path, n_sources, n_targets, output_dims, dataset_type, val_split, test_split, split='train', test_category='truck', seed=42):
         self.path = path
         self.n_sources = n_sources
         self.n_targets = n_targets
         self.output_dims = output_dims
-        self.use_constrained_views = use_constrained_views
+        self.dataset_type = dataset_type
         self.current_epoch = 0
         
-        if use_constrained_views:
-            assert self.n_sources == 2, f'use_constrained_views cannot be used with only 2 sources per scene, but {self.n_sources} were requested'
+        if dataset_type == 'cones_constrained':
+            assert self.n_sources == 2, f'dataset_type cannot be used with only 2 sources per scene, but {self.n_sources} were requested'
         
         self.seed = seed
         self.random = random.Random(seed)
@@ -35,7 +35,6 @@ class WildRGBDDataset(Dataset):
             cpaths = [(c, cpath) for c, cpath in cpaths if os.path.isdir(cpath)]
         
         cpaths.sort()
-        # cpaths = [i for i in cpaths if i[0] != 'pineapple'] # TODO
         
         spaths = []
         for c, cpath in cpaths:
@@ -58,15 +57,22 @@ class WildRGBDDataset(Dataset):
         spaths = [(sname, spath) for sname, spath in spaths if os.path.isdir(spath)]
         self.random.shuffle(spaths)
         
-        spaths = [
-            (
-                f'{sname}',
-                spath,
-                # Only uses cone 0 for val and test
-                [os.path.join(spath, 'cones', c) for c in sorted(os.listdir(os.path.join(spath, 'cones')) if split == 'train' else ['0']) if os.path.isdir(os.path.join(spath, 'cones', c))]
-            )
-            for (sname, spath) in spaths
-        ]
+        if dataset_type == 'raw':
+            spaths = [(sname, spath, [spath]) for (sname, spath) in spaths]
+        else:
+            spaths = [
+                (
+                    sname,
+                    spath,
+                    [
+                        os.path.join(spath, 'cones', c)
+                        # Only uses cone 0 for val and test
+                        for c in sorted(os.listdir(os.path.join(spath, 'cones')) if split == 'train' else ['0'])
+                        if os.path.isdir(os.path.join(spath, 'cones', c))
+                    ]
+                )
+                for (sname, spath) in spaths
+            ]
         
         self.spaths = spaths
     
@@ -121,8 +127,9 @@ class WildRGBDDataset(Dataset):
             data = edict(json.load(f))
             K = torch.tensor(data.K).reshape(3, 3).T
         
-        if self.use_constrained_views:
+        if self.dataset_type == 'cones_constrained':
             cpath = self.random.choice(cpaths)
+            sname = f'{sname}_{os.path.split(cpath)[1]}'
             
             images, depths = [sorted(self.get_image_paths(cpath, t)) for t in ('rgb', 'depth')]
             pose_strs = self.get_cam_pose_strs(cpath)

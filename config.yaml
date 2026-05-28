@@ -113,8 +113,9 @@ train:
     datasets:
       wildrgbd:
         path: ./datasets/wildrgbd/
-        # Whether to use views constrained where the targets are in between the sources to prevent forcing the model to predict unseen information
-        use_constrained_views: true
+        # Type of dataset, can be either 'raw' (raw dataset), 'cones_unconstrained' (dataset was processed splitting into view cones but use it as if it was raw), 'cones_constrained' (dataset was processed splitting into view cones and constrain it to the cones)
+        # Constrained views are when the targets are in between the sources to prevent forcing the model to hallucinate regions it has no information about
+        dataset_type: cones_constrained
 
   loss:
     # image_mse, image_perceptual, depth_silog, depth_multiscale, depth_perceptual

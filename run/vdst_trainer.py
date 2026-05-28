@@ -24,28 +24,27 @@ class VDSTTrainer(DistributedTrainer):
     def __init__(self, config, config_raw):
         super().__init__(config, config_raw)
         
-        self.val_intermediate_results_steps = 0
-        self.use_entire_val_datset_steps = 0
-        self.intermediate_results_num_train_batches = 1
-        self.intermediate_results_num_val_batches = 1
+        self.curr_val_step = 0
         
         # only saves results every 1/10th of the time that eval metrics are computed
-        self.val_intermediate_results_interval = 10
-        self.use_entire_val_datset_interval = 20
+        self.intermediate_results_num_batches = 1 # should be <= intermediate_val_num_batches
+        self.intermediate_results_interval = 10
+        
+        # only evals entire dataset every 1/1th of the time that eval metrics are computed
+        self.intermediate_val_num_batches = 1
+        self.use_entire_val_datset_interval = 2
         
         if self.is_main_process:
             self.eval_metrics = EvalMetrics().to(self.device)
     
     def state_dict(self):
         state_dict = super().state_dict()
-        state_dict['val_intermediate_results_steps'] = self.val_intermediate_results_steps
-        state_dict['use_entire_val_datset_steps'] = self.use_entire_val_datset_steps
+        state_dict['curr_val_step'] = self.curr_val_step
         
         return state_dict
     
     def load_state_dict(self, state_dict):
-        self.val_intermediate_results_steps = state_dict['val_intermediate_results_steps']
-        self.use_entire_val_datset_steps = state_dict['use_entire_val_datset_steps']
+        self.curr_val_step = state_dict['curr_val_step']
         
         return super().load_state_dict(state_dict)
     
@@ -132,7 +131,7 @@ class VDSTTrainer(DistributedTrainer):
     
     def _try_fit_power_law(self):
         pl_config = self.config.train.metric_power_law_fitting
-
+        
         if pl_config.should_fit and ((self.is_last and -1 in pl_config.instants) or self.current_step in pl_config.instants):
             start_step = self.config.train.optimizer.n_warmup_steps if pl_config.skip_warmup_steps else 0
             points = []  # TODO
@@ -186,15 +185,13 @@ class VDSTTrainer(DistributedTrainer):
         with open(os.path.join(path, 'scenes.txt'), 'w', encoding='utf8') as f:
             f.write('')
         
-        should_save_intermediate_results = self.is_last or self.val_intermediate_results_steps % self.val_intermediate_results_interval == 0
-        self.val_intermediate_results_steps += 1
+        should_save_intermediate_results = self.is_last or self.curr_val_step % self.intermediate_results_interval == 0
+        should_use_entire_val_dataset = self.is_last or self.curr_val_step % self.use_entire_val_datset_interval == 0
+        self.curr_val_step += 1
         
-        should_use_entire_val_dataset = self.is_last or self.use_entire_val_datset_steps % self.use_entire_val_datset_interval == 0
-        self.use_entire_val_datset_steps += 1
-
         # Always uses only number specified of batches for intermediate results of scenes used in training
         if should_save_intermediate_results:
-            for j in range(self.intermediate_results_num_train_batches):
+            for j in range(self.intermediate_results_num_batches):
                 train_batch = []
                 for i in range(j * self.config.train.data.train_batch_size, (j + 1) * self.config.train.data.train_batch_size):
                     train_batch.append(self.train_dataloader.dataset[i])
@@ -211,12 +208,12 @@ class VDSTTrainer(DistributedTrainer):
         
         eval_metricss = []
         for i, batch in enumerate(data_iter):
-            if not should_use_entire_val_dataset and i >= self.intermediate_results_num_val_batches:
+            if not should_use_entire_val_dataset and i >= self.intermediate_val_num_batches:
                 break
             batch_res = self.model(batch)
             
             # Always uses only number specified of batches for intermediate results of validation scenes
-            if should_save_intermediate_results:
+            if should_save_intermediate_results and i < self.intermediate_results_num_batches:
                 self._save_intermediate_results(path, i, batch_res)
             
             eval_metrics = self.eval_metrics(batch_res.gen_targets, batch_res.targets, valid_depth_range=(0.001, 20))

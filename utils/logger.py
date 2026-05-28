@@ -35,7 +35,7 @@ class Logger(ABC):
     
     def start(self, **vars):
         if self.is_main_process:
-            self._start(edict(vars))
+            return self._start(edict(vars))
     
     def end(self):
         pass

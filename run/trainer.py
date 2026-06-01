@@ -1,11 +1,12 @@
 import os
 import datetime
 from abc import ABC, abstractmethod
+import random
+import numpy as np
 import torch
 from torch.utils.data import Dataset
 from torchdata.stateful_dataloader import StatefulDataLoader
-# Model that takes in data and distributes across GPUs
-from torch.utils.data.distributed import DistributedSampler
+from torch.utils.data.distributed import DistributedSampler  # Takes in data and distributes across GPUs
 from torch.nn.parallel import DistributedDataParallel as DDP  # DDP wrapper
 import torch.distributed as dist
 import torch.amp as amp
@@ -85,6 +86,11 @@ class DistributedTrainer(ABC):
             'current_epoch': self.current_epoch,
             'current_epoch_step': self.current_epoch_step,
             'run_id': self.run_id,
+            
+            'python_rng_state': random.getstate(),
+            'numpy_rng_state': np.random.get_state(),
+            'torch_rng_state': torch.get_rng_state(),
+            'cuda_rng_state': torch.cuda.get_rng_state_all()
         }
         
         return state_dict
@@ -104,6 +110,11 @@ class DistributedTrainer(ABC):
         self.current_epoch = state_dict['current_epoch']
         self.current_epoch_step = state_dict['current_epoch_step']
         self.run_id = state_dict['run_id']
+        
+        random.setstate(state_dict['python_rng_state'])
+        np.random.set_state(state_dict['numpy_rng_state'])
+        torch.set_rng_state(state_dict['torch_rng_state'])
+        torch.cuda.set_rng_state_all(state_dict['cuda_rng_state'])
     
     def _get_last_checkpoint_path(self, path):
         os.makedirs(path, exist_ok=True)

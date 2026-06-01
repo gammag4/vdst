@@ -7,8 +7,6 @@ import torch.distributed as dist
 
 
 def enable_reproducibility(config):
-    # TODO this wont work if restarted
-
     # https://docs.pytorch.org/docs/stable/notes/randomness.html
     # https://discuss.pytorch.org/t/difference-between-torch-manual-seed-and-torch-cuda-manual-seed/13848
 
@@ -19,6 +17,7 @@ def enable_reproducibility(config):
     torch.manual_seed(seed)
 
     # Impacts performance
+    torch.backends.cudnn.deterministic = config.use_deterministic_algorithms
     torch.use_deterministic_algorithms(config.use_deterministic_algorithms)
 
     # TODO check https://docs.pytorch.org/docs/stable/notes/randomness.html#dataloader
@@ -36,7 +35,9 @@ def setup_optimizations(config):
     # the problem is that when you have a model that keeps changing at each nth iteration or where that input size changes, it becomes slower since it benchmarks again at every change
     # a rule of thumb would be to run for some time with and without it and check which is faster in the later steps (without considering the first one)
     # This affects reproducibility
-    torch.backends.cudnn.benchmark = config.benchmark_kernels
+    torch.backends.cudnn.benchmark = config.benchmark_kernels and not config.use_deterministic_algorithms
+    if config.use_deterministic_algorithms and config.benchmark_kernels:
+        print('Both use_deterministic_algorithms and benchmark_kernels are set to True, so benchmark_kernels will be ignored')
 
 
 def init_distributed(config):

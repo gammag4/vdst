@@ -66,7 +66,11 @@ def parse_config(config):
 def process_config(config):
     acc = torch.accelerator.current_accelerator()
     config.setup.distributed.device = f'{acc}:{config.setup.distributed.local_rank}'
+    
+    # Uses different seed for each rank
+    config.setup.seed = config.setup.seed + config.setup.distributed.rank
 
+    # Distributes work evenly across cpus
     num_cpus = os.cpu_count()
     config.setup.distributed.num_threads = num_cpus // config.setup.distributed.local_world_size + \
         (1 if config.setup.distributed.local_rank > num_cpus % config.setup.distributed.local_world_size else 0)

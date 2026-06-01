@@ -10,7 +10,7 @@ def enable_reproducibility(config):
     # https://docs.pytorch.org/docs/stable/notes/randomness.html
     # https://discuss.pytorch.org/t/difference-between-torch-manual-seed-and-torch-cuda-manual-seed/13848
 
-    seed = config.seed + config.distributed.rank
+    seed = config.seed
     os.environ['PYTHONHASHSEED'] = str(seed)
     random.seed(seed)
     np.random.seed(seed)

@@ -48,6 +48,6 @@ class Timer:
         self.delta = state_dict['delta']
         self.avg_delta = state_dict['avg_delta']
         self.total = state_dict['total']
-        self._last_time = state_dict['last_time']
+        self._last_time = time.perf_counter()
         self.total_steps = state_dict['total_steps']
         self.skipped = state_dict['skipped']

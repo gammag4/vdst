@@ -8,12 +8,12 @@ import torchvision.transforms.functional as VF
 
 class PerceptualLoss(nn.Module):
     # model_type: convnext, vgg, vgg2, vgg3
-    # transforms: default, default_no_crop, normalize_only
+    # transforms: 'default', 'default_size_224', 'default_size_236', 'normalize_only' or 'standardize_normalize'
     def __init__(self, config, dist_fn_raw=torch.square, dist_fn=torch.abs):
         super().__init__()
         model_type = config.type
         layer_weights = config.weights
-        transforms = config.transforms
+        self.transforms_type = config.transforms
         
         self.dist_fn_raw = dist_fn_raw
         self.dist_fn = dist_fn
@@ -27,6 +27,8 @@ class PerceptualLoss(nn.Module):
         elif model_type in ['vgg', 'vgg2', 'vgg3']:
             weights = VGG19_Weights.DEFAULT
             self.model = vgg19(weights=weights)
+            
+            # AvgPool allows better differentiability
             features = [nn.AvgPool2d(kernel_size=2, stride=2) if isinstance(i, nn.MaxPool2d) else i for i in self.model.features]
             if model_type == 'vgg3':
                 indices = [0] + [i + 1 for i, e in enumerate(features) if isinstance(e, nn.ReLU)]
@@ -34,7 +36,7 @@ class PerceptualLoss(nn.Module):
                 indices = [0] + [i for i, e in enumerate(features) if isinstance(e, nn.AvgPool2d)]
             else:
                 indices = [0, 4, 9, 14, 23, 32] # layers conv1_2 ... conv5_2 from https://arxiv.org/pdf/1707.09405 p. 5
-            self.layers = [nn.Sequential(features[s:e]) for s, e in zip(indices[:-1], indices[1:])]
+            self.layers = [nn.Sequential(*features[s:e]) for s, e in zip(indices[:-1], indices[1:])]
             
             layer_weights = torch.ones(len(indices), dtype=torch.float32) if layer_weights is None else layer_weights
         else:
@@ -43,17 +45,38 @@ class PerceptualLoss(nn.Module):
         # TODO test with classifier layer
         # self.classifier_layer = lambda x: self.model.classifier(self.model.avgpool(x))
         
-        if transforms in ['default', 'default_no_crop']:
-            self.transforms = weights.transforms()
-            if transforms == 'default_no_crop':
-                self.transforms.resize_size=224 # resizing to same cropping size to not lose information
-        elif transforms == 'normalize_only':
+        if self.transforms_type in ['default', 'default_size_224', 'default_size_236']:
+            self.base_transforms = weights.transforms()
+            
+            # resizing and cropping at same size to not lose information
+            if self.transforms_type == 'default_size_224':
+                self.base_transforms.resize_size=224
+            if self.transforms_type == 'default_size_236':
+                self.base_transforms.crop_size=236
+            
+        elif self.transforms_type in ['normalize_only', 'standardize_normalize']:
             # Following standard settings for ImageNet 1K from:
             # https://docs.pytorch.org/vision/main/models/generated/torchvision.models.convnext_tiny.html
             # https://docs.pytorch.org/vision/main/models/generated/torchvision.models.vgg19.html
-            self.transforms = T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            self.base_transforms = T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            
+            if self.transforms_type == 'standardize_normalize':
+                # Using transforms in pairs allows it to standardize in comparison to ground truth, making it dependent on scale discrepancies
+                def base_t(x, y):
+                    eps = 1e-5
+                    (m1, s1), (m2, s2) = [(einx.mean('... v c h w -> ... 1 1 1 1', t), einx.std('... v c h w -> ... 1 1 1 1', t)) for t in (x, y)]
+                    m = (m1 + m2) * 0.5
+                    s = ((s1 ** 2 + s2 ** 2) * 0.5 + ((m1 - m2) * 0.5) ** 2).sqrt() + eps
+                    
+                    return tuple((t - m) / s for t in (x, y))
+                
+                self.transforms = lambda x, y: [self.base_transforms(t) for t in base_t(x, y)]
+            
         else:
-            assert False, f'Invalid transforms type "{transforms}"'
+            assert False, f'Invalid transforms type "{self.transforms_type}"'
+        
+        if self.transforms_type != 'standardize_normalize':
+            self.transforms = lambda x, y: (self.base_transforms(x), self.base_transforms(y))
         
         self.layer_weights = nn.Buffer(layer_weights)
     
@@ -80,7 +103,11 @@ class PerceptualLoss(nn.Module):
         if use_raw_distance:
             losses.append(self.forward_layer(x1, x2, dist_fn=self.dist_fn_raw))
         
-        x1, x2 = [self.transforms(VF.center_crop(t, max(t.shape[-1], t.shape[-2]))) for t in (input, target)]
+        if 'default' in self.transforms_type:
+            # Pads with zeros to make it square
+            x1, x2 = [VF.center_crop(t, max(t.shape[-1], t.shape[-2])) for t in (input, target)]
+        x1, x2 = self.transforms(x1, x2)
+        
         for l in self.layers:
             x1, x2 = l(x1), l(x2)
             losses.append(self.forward_layer(x1, x2, dist_fn=self.dist_fn))

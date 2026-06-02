@@ -126,8 +126,8 @@ train:
     perceptual:
       # Either 'constant' or 'falling_perceptual'
       scheduler: falling_perceptual
-      # Either 'default', 'default_no_crop' or 'normalize_only'
-      transforms: 'default_no_crop'
+      # Either 'default', 'default_size_224', 'default_size_236', 'normalize_only' or 'standardize_normalize'
+      transforms: default_size_224
       weights: null
       # Either 'convnext', 'vgg', 'vgg2', 'vgg3'
       type: convnext

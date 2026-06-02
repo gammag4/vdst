@@ -135,48 +135,6 @@ old_experiments:
       train:
         loss:
           weights: [2.0,2.0,0.7,1.0,0.0]
-  percep loss architecture:
-    convnext:
-      train:
-        loss:
-          perceptual:
-            type: convnext
-            transforms: normalize_only
-    convnext def:
-      train:
-        loss:
-          perceptual:
-            type: convnext
-            transforms: default
-    convnext def no crop:
-      train:
-        loss:
-          perceptual:
-            type: convnext
-            transforms: default_no_crop
-    vgg:
-      train:
-        loss:
-          perceptual:
-            type: vgg
-            transforms: normalize_only
-    vgg def transf:
-      train:
-        loss:
-          perceptual:
-            type: vgg
-            transforms: default
-    vgg2:
-      train:
-        loss:
-          perceptual:
-            type: vgg2
-            transforms: default
-    # vgg3:
-    #   train:
-    #     loss:
-    #       perceptual:
-    #         type: vgg3
   new dataset:
     old:
       train:
@@ -199,3 +157,60 @@ old_experiments:
             wildrgbd:
               path: /media/gabriel/sandisk_1tb/wildrgbd/
               dataset_type: cones_constrained
+  percep loss architecture:
+    convnext stand norm:
+      train:
+        loss:
+          weights: [2.0,2.0,0.0,0.0,0.0]
+          perceptual:
+            type: convnext
+            transforms: standardize_normalize
+    convnext norm only:
+      train:
+        loss:
+          weights: [2.0,2.0,0.0,0.0,0.0]
+          perceptual:
+            type: convnext
+            transforms: normalize_only
+    vgg def:
+      train:
+        loss:
+          weights: [2.0,2.0,0.0,0.0,0.0]
+          perceptual:
+            type: vgg
+            transforms: default
+    vgg2 def:
+      train:
+        loss:
+          weights: [2.0,2.0,0.0,0.0,0.0]
+          perceptual:
+            type: vgg2
+            transforms: default
+    vgg3 def:
+      train:
+        loss:
+          weights: [2.0,2.0,0.0,0.0,0.0]
+          perceptual:
+            type: vgg3
+            transforms: default
+    convnext def:
+      train:
+        loss:
+          weights: [2.0,2.0,0.0,0.0,0.0]
+          perceptual:
+            type: convnext
+            transforms: default
+    convnext def 224:
+      train:
+        loss:
+          weights: [2.0,2.0,0.0,0.0,0.0]
+          perceptual:
+            type: convnext
+            transforms: default_size_224
+    convnext def 236:
+      train:
+        loss:
+          weights: [2.0,2.0,0.0,0.0,0.0]
+          perceptual:
+            type: convnext
+            transforms: default_size_236

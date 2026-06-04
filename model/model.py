@@ -17,6 +17,10 @@ class VDST(nn.Module):
         
         self.config = config
         
+        assert self.config.depth_normalization_type in [None, 'standardize', 'min_max'], f'Invalid depth normalization "{self.config.depth_normalization_type}"'
+        
+        self.dmin, self.dmax = self.config.d_range
+        
         self.transformer = Encoder(
             self.config.n_layers,
             self.config.d_model,
@@ -74,34 +78,54 @@ class VDST(nn.Module):
     
     def normalize_sources(self, images, depths):
         eps = 1e-8
+        normalization_factors = None
         
-        depths = (depths + eps).log()
+        images = images * 2.0 - 1.0
         
-        sumdims = (-4, -3, -2, -1)
-        (imean, istd), (dmean, dstd) = [(t.mean(dim=sumdims, keepdim=True), t.std(dim=sumdims, keepdim=True)) for t in (images, depths)]
-        
-        if self.config.standardize_inputs:
-            images = (images - imean) / (istd + eps)
-            depths = (depths - dmean) / (dstd + eps)
+        if self.config.depth_normalization_type == 'min_max':
+            # TODO check if its more precise
+            # depths = depths - self.dmin
+            # d_range = torch.tensor(self.dmax - self.dmin)
+            # depths = ((torch.e - 1.0) * depths + d_range).log() - d_range.log()
+            # depths = depths * 2.0 - 1.0
+            
+            depths = (depths - self.dmin) / (self.dmax - self.dmin)
+            depths = ((torch.e - 1.0) * depths).log1p()
+            depths = depths * 2.0 - 1.0
         else:
-            images = images * 2.0 - 1.0
-        
-        normalization_factors = imean, istd, dmean, dstd
+            depths = (depths + eps).log()
+            
+            if self.config.depth_normalization_type == 'standardize':
+                sumdims = (-4, -3, -2, -1)
+                dmean, dstd = depths.mean(dim=sumdims, keepdim=True), depths.std(dim=sumdims, keepdim=True)
+                normalization_factors = dmean, dstd
+                depths = (depths - dmean) / (dstd + eps)
         
         return images, depths, normalization_factors
     
     def denormalize_targets(self, images, depths, normalization_factors):
         eps = 1e-8
         
-        imean, istd, dmean, dstd = normalization_factors
-
         images = torch.sigmoid(images)
         
-        if self.config.standardize_inputs:
-            images = (istd + eps) * images + imean
-            depths = (dstd + eps) * depths + dmean
-        
-        depths = depths.exp()
+        if self.config.depth_normalization_type == 'min_max':
+            # TODO check if its more precise
+            # depths = torch.sigmoid(depths)
+            # # depths = (depths + 1.0) * 0.5
+            # d_range = torch.tensor(self.dmax - self.dmin)
+            # depths = ((depths + d_range.log()).exp() - d_range) / (torch.e - 1.0)
+            # depths = depths + self.dmin
+
+            depths = torch.sigmoid(depths)
+            # depths = (depths + 1.0) * 0.5
+            depths = depths.expm1() / (torch.e - 1.0)
+            depths = (self.dmax - self.dmin) * depths + self.dmin
+        else:
+            if self.config.depth_normalization_type == 'standardize':
+                dmean, dstd = normalization_factors
+                depths = (dstd + eps) * depths + dmean
+            
+            depths = depths.exp()
         
         return images, depths
     
@@ -110,19 +134,29 @@ class VDST(nn.Module):
         sources, targets = scene.sources, scene.targets
         targets_hw = (targets.images if targets.images is not None else sources.images).shape[-2:]
         sources_images, sources_depths, normalization_factors = self.normalize_sources(sources.images, sources.depths)
+        sources_depth_masks, targets_depth_masks = [(t.depth_masks & ((t.depths > self.dmin) & (t.depths < self.dmax))) for t in (sources, targets)]
+        
         sources = edict(
             K=sources.K,
             R=sources.R,
             t=sources.t,
             images=sources_images,
             depths=sources_depths,
-            depth_masks=sources.depth_masks
+            depth_masks=sources_depth_masks
         )
         queries = edict(
             K=targets.K,
             R=targets.R,
             t=targets.t,
             hw=targets_hw
+        )
+        targets = edict(
+            K=targets.K,
+            R=targets.R,
+            t=targets.t,
+            images=targets.images,
+            depths=targets.depths,
+            depth_masks=targets_depth_masks
         )
 
         source_embeds, _ = self.pose_encoder_source(sources)

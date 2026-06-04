@@ -5,7 +5,6 @@ overrides:
     enc_residual_layer_norm: false
     dec_layer_norm: false
     dec_residual_layer_norm: false
-    standardize_inputs: false
   train:
     n_steps: 500000
 
@@ -62,6 +61,116 @@ experiments:
   #         output_dims: [64, 64]
   #         train_batch_size: 8
   #         val_batch_size: 8
+  d percep interp nearest:
+    # log depth n log loss:
+    #   train:
+    #     loss:
+    #       weights: [0.0,0.0,0.08,0.0,1.0]
+    #       perceptual:
+    #         depth:
+    #           input_type: log_depth
+    #           is_diff: false
+    # log depth n norm log loss:
+    #   train:
+    #     loss:
+    #       weights: [0.0,0.0,0.08,0.0,1.0]
+    #       perceptual:
+    #         depth:
+    #           input_type: norm_log_depth
+    #           is_diff: false
+    log depth n norm log diff loss:
+      train:
+        loss:
+          weights: [0.0,0.0,0.08,0.0,1.0]
+          perceptual:
+            depth:
+              input_type: norm_log_depth
+      model:
+        depth_normalization_type: null
+    log depth n log diff loss:
+      train:
+        loss:
+          weights: [0.0,0.0,0.08,0.0,1.0]
+          perceptual:
+            depth:
+              input_type: log_depth
+      model:
+        depth_normalization_type: null
+    # log depth n norm log diff loss interp bilinear:
+    #   train:
+    #     loss:
+    #       weights: [0.0,0.0,0.08,0.0,1.0]
+    #       perceptual:
+    #         depth:
+    #           input_type: norm_log_depth
+    #           interpolation: default
+    log depth n norm log diff loss first percep layers:
+      train:
+        loss:
+          weights: [0.0,0.0,0.08,0.0,1.0]
+          perceptual:
+            depth:
+              weights: [2.0, 1.0, 1.0, 1.0, 0.7, 0.3, 0.0, 0.0, 0.0]
+              input_type: norm_log_depth
+      model:
+        depth_normalization_type: null
+    log depth n log diff loss first percep layers:
+      train:
+        loss:
+          weights: [0.0,0.0,0.08,0.0,1.0]
+          perceptual:
+            depth:
+              weights: [2.0, 1.0, 1.0, 1.0, 0.7, 0.3, 0.0, 0.0, 0.0]
+              input_type: log_depth
+      model:
+        depth_normalization_type: null
+    norm log depth n norm log diff loss:
+      train:
+        loss:
+          weights: [0.0,0.0,0.08,0.0,1.0]
+          perceptual:
+            depth:
+              input_type: norm_log_depth
+      model:
+        depth_normalization_type: min_max
+    norm log depth n log diff loss:
+      train:
+        loss:
+          weights: [0.0,0.0,0.08,0.0,1.0]
+          perceptual:
+            depth:
+              input_type: log_depth
+      model:
+        depth_normalization_type: min_max
+    no d percep:
+      train:
+        loss:
+          weights: [0.0,0.0,0.08,0.0,0.0]
+  # d percep arch:
+  #   convnext stand norm:
+  #     train:
+  #       loss:
+  #         weights: [0.0,0.0,0.08,0.0,1.0]
+  #         perceptual:
+  #           depth:
+  #             type: convnext
+  #             transforms: standardize
+  #   convnext norm only:
+  #     train:
+  #       loss:
+  #         weights: [0.0,0.0,0.08,0.0,1.0]
+  #         perceptual:
+  #           depth:
+  #             type: convnext
+  #             transforms: normalize
+  #   convnext def 224:
+  #     train:
+  #       loss:
+  #         weights: [0.0,0.0,0.08,0.0,1.0]
+  #         perceptual:
+  #           depth:
+  #             type: convnext
+  #             transforms: default_size_224
 
 old_experiments:
   lr:

@@ -18,12 +18,13 @@ class EvalMetrics(nn.Module):
         for param in self.parameters():
             param.requires_grad = False
     
-    def forward(self, gen_targets, targets, valid_depth_range=(0.001, 20)):
+    def forward(self, gen_targets, targets, valid_depth_range=(0.01, 20)):
+        dmin, dmax = valid_depth_range
         images, depths = gen_targets.images.detach(), gen_targets.depths.detach()
         images_gt, depths_gt = targets.images.detach(), targets.depths.detach()
         depths_gt_masks = targets.depth_masks.detach()
         
-        valid_depth_masks = depths_gt_masks & (depths_gt > valid_depth_range[0]) & (depths_gt < valid_depth_range[1])
+        valid_depth_masks = depths_gt_masks & (depths_gt > dmin) & (depths_gt < dmax)
         
         def reduce(op, t):
             return op('... c h w -> ...', t)

@@ -214,7 +214,7 @@ class VDSTTrainer(DistributedTrainer):
             if should_save_intermediate_results and i < self.intermediate_results_num_batches:
                 self._save_intermediate_results(path, i, batch_res)
             
-            eval_metrics = self.eval_metrics(batch_res.gen_targets, batch_res.targets, valid_depth_range=(0.001, 20))
+            eval_metrics = self.eval_metrics(batch_res.gen_targets, batch_res.targets, valid_depth_range=self.config.model.d_range)
             eval_metrics.num_images = eval_metrics.images.psnr.numel()
             
             eval_metricss.append(eval_metrics)

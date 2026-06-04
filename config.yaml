@@ -126,19 +126,34 @@ train:
     perceptual:
       # Either 'constant' or 'falling_perceptual'
       scheduler: falling_perceptual
-      # Either 'default', 'default_size_224', 'default_size_236', 'normalize_only' or 'standardize_normalize'
-      transforms: default_size_224
-      weights: null
-      # Either 'convnext', 'vgg', 'vgg2', 'vgg3'
-      type: convnext
-      # weights: [2.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-      # weights: [1.6, 1.0, 0.8, 0.7, 0.5, 0.5, 0.5, 0.5, 0.5)#, 0.2]
-      # type: vgg
-      # weights: [2.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-      # type: vgg2
-      # weights: [2.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-      # type: vgg3
-      # weights: [2.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+      image:
+        # Either 'default', 'default_size_224', 'default_size_236', 'normalize' or 'standardize'
+        transforms: default_size_224
+        # Weights for each layer, either array or null for all ones
+        weights: null
+        # Either 'convnext', 'vgg', 'vgg2', 'vgg3'
+        type: convnext
+        # weights: [2.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+        # weights: [1.6, 1.0, 0.8, 0.7, 0.5, 0.5, 0.5, 0.5, 0.5)#, 0.2]
+        # type: vgg
+        # weights: [2.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+        # type: vgg2
+        # weights: [2.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+        # type: vgg3
+        # weights: [2.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+        # Either 'nearest' or 'default' (bilinear)
+        interpolation: default
+        # Either 'image', 'log_depth' or 'norm_log_depth'
+        input_type: image
+        # If true, compares the difference between the images with the average image (just an image with all values at exactly the mean)
+        is_diff: false
+      depth:
+        transforms: default_size_224
+        weights: null
+        type: convnext
+        interpolation: nearest
+        input_type: norm_log_depth
+        is_diff: true
     # SILog loss config
     silog:
       # How much to penalize absolute scale errors
@@ -187,8 +202,11 @@ model:
   # Enable/disable layer norm in dec layers
   dec_layer_norm: false
   dec_residual_layer_norm: false
-  # Whether to normalize images and depths to mean 0 std 1 before inputting to the network and denormalize after output
-  standardize_inputs: false
+  # Depth range (min, max)
+  d_range: [0.01, 1000.0] # 1cm to 1km
+  # Type of normalization for images and depths
+  # Can be either 'standardize' (standardizes depths to to mean 0 std 1) 'min_max' (normalizes depth to min-max range) or null
+  depth_normalization_type: min_max
   # Enable/disable activation checkpointing
   use_activation_checkpointing: true
 

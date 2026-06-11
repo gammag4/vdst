@@ -6,6 +6,7 @@ import einx
 
 from .pose_encoder import PoseEncoder
 from .transformer import Encoder
+from utils.data import normalize_depths, denormalize_depths
 
 
 class VDST(nn.Module):
@@ -83,14 +84,7 @@ class VDST(nn.Module):
         images = images * 2.0 - 1.0
         
         if self.config.depth_normalization_type == 'min_max':
-            # TODO check if its more precise
-            # depths = depths - self.dmin
-            # d_range = torch.tensor(self.dmax - self.dmin)
-            # depths = ((torch.e - 1.0) * depths + d_range).log() - d_range.log()
-            # depths = depths * 2.0 - 1.0
-            
-            depths = (depths - self.dmin) / (self.dmax - self.dmin)
-            depths = ((torch.e - 1.0) * depths).log1p()
+            depths = normalize_depths(depths, self.dmin, self.dmax)
             depths = depths * 2.0 - 1.0
         else:
             depths = (depths + eps).log()
@@ -109,17 +103,9 @@ class VDST(nn.Module):
         images = torch.sigmoid(images)
         
         if self.config.depth_normalization_type == 'min_max':
-            # TODO check if its more precise
-            # depths = torch.sigmoid(depths)
-            # # depths = (depths + 1.0) * 0.5
-            # d_range = torch.tensor(self.dmax - self.dmin)
-            # depths = ((depths + d_range.log()).exp() - d_range) / (torch.e - 1.0)
-            # depths = depths + self.dmin
-
             depths = torch.sigmoid(depths)
             # depths = (depths + 1.0) * 0.5
-            depths = depths.expm1() / (torch.e - 1.0)
-            depths = (self.dmax - self.dmin) * depths + self.dmin
+            depths = denormalize_depths(depths, self.dmin, self.dmax)
         else:
             if self.config.depth_normalization_type == 'standardize':
                 dmean, dstd = normalization_factors

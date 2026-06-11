@@ -5,6 +5,30 @@ import einx
 import torchvision.transforms.functional as VF
 
 
+def normalize_depths(depths, min, max):
+    # TODO check if its more precise
+    # depths = depths - min
+    # d_range = torch.tensor(max - min)
+    # depths = ((torch.e - 1.0) * depths + d_range).log() - d_range.log()
+    
+    depths = (depths - min) / (max - min)
+    depths = ((torch.e - 1.0) * depths).log1p()
+    
+    return depths
+
+
+def denormalize_depths(depths, min, max):
+    # TODO check if its more precise
+    # d_range = torch.tensor(max - min)
+    # depths = ((depths + d_range.log()).exp() - d_range) / (torch.e - 1.0)
+    # depths = depths + min
+    
+    depths = depths.expm1() / (torch.e - 1.0)
+    depths = (max - min) * depths + min
+    
+    return depths
+
+
 def get_image(path, is_depth, output_dims):
     img = cv2.imread(path, cv2.IMREAD_UNCHANGED) if is_depth else cv2.imread(path)
     
@@ -73,3 +97,26 @@ def process_data(c2ws, K, image_paths, depth_paths, output_dims):
         depth_masks=depth_masks
     )
     return views
+
+
+def random_rotation_matrix(device=None, dtype=torch.float32):
+    # Uniform random numbers in [0, 1)
+    u1, u2, u3 = torch.rand(3, device=device, dtype=dtype)
+
+    # Random unit quaternion (x, y, z, w)
+    q = torch.stack([
+        torch.sqrt(1 - u1) * torch.sin(2 * torch.pi * u2),
+        torch.sqrt(1 - u1) * torch.cos(2 * torch.pi * u2),
+        torch.sqrt(u1) * torch.sin(2 * torch.pi * u3),
+        torch.sqrt(u1) * torch.cos(2 * torch.pi * u3),
+    ])
+
+    x, y, z, w = q
+
+    R = torch.tensor([
+        [1 - 2 * (y*y + z*z), 2 * (x*y - w*z),     2 * (x*z + w*y)],
+        [2 * (x*y + w*z),     1 - 2 * (x*x + z*z), 2 * (y*z - w*x)],
+        [2 * (x*z - w*y),     2 * (y*z + w*x),     1 - 2 * (x*x + y*y)],
+    ], device=device, dtype=dtype)
+
+    return R

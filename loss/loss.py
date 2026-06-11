@@ -6,6 +6,7 @@ from easydict import EasyDict as edict
 
 from .multiscale_grad import MultiScaleGradLoss
 from .perceptual import PerceptualLoss
+from utils.data import normalize_depths
 
 
 class Loss(nn.Module):
@@ -55,7 +56,7 @@ class Loss(nn.Module):
             depths_log2 = torch.where(depths_log.isinf() | depths_log.isnan(), depths_gt_log, depths_log)
             d1, d2 = depths_log2, depths_gt_log
         elif self.depth_perceptual_type == 'norm_log_depth':
-            depths_norm, depths_gt_norm = [((torch.e - 1.0) * (t - self.dmin) / (self.dmax - self.dmin)).log1p() for t in (depths, depths_gt)]
+            depths_norm, depths_gt_norm = [normalize_depths(t, self.dmin, self.dmax) for t in (depths, depths_gt)]
             depths_norm, depths_gt_norm = [torch.where(depths_gt_masks, t, 0.0) for t in (depths_norm, depths_gt_norm)]
             depths_norm2 = torch.where(depths_norm.isinf() | depths_norm.isnan(), depths_gt_norm, depths_norm)
             d1, d2 = depths_norm2, depths_gt_norm

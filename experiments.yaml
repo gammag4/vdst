@@ -18,7 +18,7 @@ overrides:
 
 setup:
   out_path: results/experiments/
-  total_experiment_steps: 20000
+  total_experiment_steps: [10, 100, 1000, 5000, 10000, 20000]
   use_seed_model: true
   seed_model_steps: 40000
 

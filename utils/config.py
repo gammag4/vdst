@@ -120,24 +120,28 @@ def load_experiments_config(path, experiments_path, cli_args):
         config = process_config(config)
 
         seed_model_config = (config, config_raw)
+    
+    if isinstance(setup_config.total_experiment_steps, int):
+        setup_config.total_experiment_steps = [setup_config.total_experiment_steps]
 
     experiments = []
-    for k, v in experiments_config['experiments'].items():
-        group_name = f'e {k}'
-        for k2, v2 in v.items():
-            name = f'e {k2}'
+    for total_experiment_steps in setup_config.total_experiment_steps:
+        for k, v in experiments_config['experiments'].items():
+            group_name = f'e {k}'
+            for k2, v2 in v.items():
+                name = f'e {k2}'
 
-            config = OmegaConf.merge(global_config, v2)
-            config = parse_omega_config(config)
+                config = OmegaConf.merge(global_config, v2)
+                config = parse_omega_config(config)
 
-            config.train.logger.run_group_name = group_name
-            config.train.logger.run_name = name
-            config.train.checkpoints.path = os.path.join(setup_config.out_path, group_name, name)
-            config.train.n_real_steps = setup_config.total_experiment_steps
+                config.train.logger.run_group_name = group_name
+                config.train.logger.run_name = name
+                config.train.checkpoints.path = os.path.join(setup_config.out_path, group_name, name)
+                config.train.n_real_steps = total_experiment_steps
 
-            config_raw = edict_to_dict(config)
-            config = process_config(config)
+                config_raw = edict_to_dict(config)
+                config = process_config(config)
 
-            experiments.append((config, config_raw))
+                experiments.append((config, config_raw))
 
     return experiments, setup_config, seed_model_config

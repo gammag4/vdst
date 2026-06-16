@@ -122,6 +122,7 @@ train:
     # weights: [3.0, 0.5, 1.0, 1.0, 0.4]
     weights: [2.0, 1.0, 1.0, 1.0, 1.0]
     # weights: [0.5, 1.0, 0.5, 1.0, 0.5]
+    should_normalize_weights: true
     # Perceptual loss config
     perceptual:
       # Either 'constant' or 'falling_perceptual'

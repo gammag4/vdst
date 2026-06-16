@@ -22,6 +22,7 @@ class Loss(nn.Module):
         self.multiscale_grad_loss = MultiScaleGradLoss(n_scales=4)
         self.depth_perceptual_type = self.config.perceptual.depth.input_type
         self.dmin, self.dmax = self.model_config.d_range
+        self.should_normalize_weights = self.config.should_normalize_weights
         
         self.eval()
         for param in self.parameters():
@@ -88,7 +89,9 @@ class Loss(nn.Module):
             depth_perceptual_loss
         ])
         weighted_losses = weights * losses
-        loss = weighted_losses.sum() / weights.sum()
+        loss = weighted_losses.sum()
+        if self.should_normalize_weights:
+            loss = loss / weights.sum()
         
         res = edict(
             loss=loss,

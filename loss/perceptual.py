@@ -8,16 +8,22 @@ import torchvision.transforms.functional as VF
 from easydict import EasyDict as edict
 
 
+def normalize_conv2d_layer(layer):
+    layer.bias.zero_()
+    layer.weight.fill_(1.0 / layer.weight.shape[-3:].numel())
+
+
 class PerceptualLoss(nn.Module):
     cnn_archs = edict()
     
     def __init__(self, config, dist_fn_raw=torch.square, dist_fn=torch.abs):
         super().__init__()
         
+        self.mask_threshold = config.get('mask_threshold', None)
         model_type = config.type
         layer_weights = config.weights
         self.transforms_type = config.transforms
-        input_type = config.input_type
+        self.input_type = config.input_type
         self.is_diff = config.is_diff
         interpolation = config.interpolation
         
@@ -28,20 +34,20 @@ class PerceptualLoss(nn.Module):
         assert model_type in ['convnext', 'vgg', 'vgg2', 'vgg3'], f'Invalid model type "{model_type}"'
         
         # The stats from CO3D were estimated from the processed dataset, so they are different from the ones from the full raw dataset
-        if input_type == 'image':
+        if self.input_type == 'image':
             # Gets defaults for imagenet1k
             data_mean, data_std = None, None
-        elif input_type == 'log_depth':
+        elif self.input_type == 'log_depth':
             # From CO3D
             data_mean, data_std = -0.2749, 0.9187
-        elif input_type == 'norm_log_depth':
+        elif self.input_type == 'norm_log_depth':
             # From CO3D
             # TODO these values were computed for d_min = 0.01 and d_max = 1000.0
             # if the range changes, these need to be recomputed for the new range
             # fix this so that it can be normalized for range shifts (they were computed from the formula in loss.py)
-            data_mean, data_std = 0.0020, 0.0018
+            data_mean, data_std = 0.0020, 0.0018 #TODO i changed the normalization computation recompute this 
         else:
-            assert False, f'Invalid input type "{input_type}"'
+            assert False, f'Invalid input type "{self.input_type}"'
         
         if self.is_diff and data_mean is not None:
             data_mean, data_std = 0.0, data_std * (2 ** 0.5)
@@ -49,8 +55,11 @@ class PerceptualLoss(nn.Module):
         norm_dict = dict(mean=[data_mean] * 3, std=[data_std] * 3) if data_mean is not None else None
         
         arch = self.cnn_archs.get(model_type, None)
+        mask_arch = self.cnn_archs.get(model_type + '_mask', None) if self.input_type != 'image' else None
         if arch is not None:
             weights, self.model, self.layers = arch.weights, arch.model, arch.layers
+        if mask_arch is not None:
+            self.mask_model, self.mask_layers = arch.model, arch.layers
         
         if model_type == 'convnext':
             if arch is None:
@@ -58,6 +67,26 @@ class PerceptualLoss(nn.Module):
                 self.model = convnext_tiny(weights=weights)
                 self.layers = list(self.model.features)
                 self.cnn_archs[model_type] = edict(weights=weights, model=self.model, layers=self.layers)
+            
+            # Creates depth mask network
+            if self.input_type != 'image' and mask_arch is None:
+                self.mask_model = convnext_tiny()
+                self.mask_model.eval()
+                for param in self.mask_model.parameters():
+                    param.requires_grad = False
+                
+                self.mask_model.features[0] = self.mask_model.features[0][0]
+                for i in range(1, 8, 2):
+                    for j, e in enumerate(self.mask_model.features[i]):
+                        self.mask_model.features[i][j] = e.block[0]
+                        normalize_conv2d_layer(self.mask_model.features[i][j])
+                for i in range(2, 8, 2):
+                    self.mask_model.features[i] = self.mask_model.features[i][1]
+                for i in range(0, 8, 2):
+                    normalize_conv2d_layer(self.mask_model.features[i])
+                
+                self.mask_layers = list(self.mask_model.features)
+                self.cnn_archs[model_type + '_mask'] = edict(model=self.mask_model, layers=self.mask_layers)
             
             layer_weights = torch.ones(9, dtype=torch.float32) if layer_weights is None else torch.tensor(layer_weights, dtype=torch.float32)
             
@@ -68,6 +97,15 @@ class PerceptualLoss(nn.Module):
             
             # AvgPool allows better differentiability
             features = [nn.AvgPool2d(kernel_size=2, stride=2) if isinstance(i, nn.MaxPool2d) else i for i in self.model.features]
+            
+            if self.input_type != 'image' and mask_arch is None:
+                self.mask_model = vgg19()
+                self.mask_model.eval()
+                for param in self.mask_model.parameters():
+                    param.requires_grad = False
+                
+                mask_features = [nn.AvgPool2d(kernel_size=2, stride=2) if isinstance(i, nn.MaxPool2d) else i for i in self.mask_model.features]
+            
             if model_type == 'vgg3':
                 indices = [0] + [i + 1 for i, e in enumerate(features) if isinstance(e, nn.ReLU)]
             elif model_type == 'vgg2':
@@ -79,10 +117,17 @@ class PerceptualLoss(nn.Module):
                 self.layers = [nn.Sequential(*features[s:e]) for s, e in zip(indices[:-1], indices[1:])]
                 self.cnn_archs[model_type] = edict(weights=weights, model=self.model, layers=self.layers)
             
+            if self.input_type != 'image' and mask_arch is None:
+                self.mask_layers = [nn.Sequential(*mask_features[s:e]) for s, e in zip(indices[:-1], indices[1:])]
+                for l in self.mask_layers:
+                    for i in range(len(l) - 1, -1, -1):
+                        if isinstance(l[i], nn.ReLU):
+                            l.pop(i)
+                        elif isinstance(l[i], nn.Conv2d):
+                            normalize_conv2d_layer(l[i])
+                self.cnn_archs[model_type + '_mask'] = edict(weights=weights, model=self.mask_model, layers=self.mask_layers)
+            
             layer_weights = torch.ones(len(indices), dtype=torch.float32) if layer_weights is None else layer_weights
-        
-        # TODO test with classifier layer
-        # self.classifier_layer = lambda x: self.model.classifier(self.model.avgpool(x))
         
         if self.transforms_type in ['default', 'default_size_224', 'default_size_236']:
             self.base_transforms = weights.transforms(**norm_dict) if norm_dict is not None else weights.transforms()
@@ -113,6 +158,7 @@ class PerceptualLoss(nn.Module):
                 
                 return tuple((t - m) / s for t in (x, y))
             
+            self.base_transforms = lambda x: x
             self.transforms = base_t
             
         else:
@@ -127,45 +173,66 @@ class PerceptualLoss(nn.Module):
         for param in self.parameters():
             param.requires_grad = False
     
-    def distance(self, x1, x2, dist_fn=torch.abs):
+    def distance(self, x1, x2, m, dist_fn=torch.abs):
         # TODO check which is better l1 or l2 (l1 is more like a mean of the per-pixel errors and l2 is more like a distance in the space of possible images)
         # Using l1 for now so that it is equivalent to a score where 1 is furthest image possible (image of zeros vs image of ones) and 0 is closest possible (exact match)
         # Then that score is used to know how well it is still maintaining information from previous frames in current latent embeds
         # This also sums over batch dim, unlike other models, to allow loss to be proportional to batch size
         # return torch.norm(x1 - x2, p=1, dim=-1).sum() / x1.shape[-1] # norm / C * H * W
-        return dist_fn(x1 - x2).mean(dim=-1) # norm / C * H * W
-        # return ((x1 - x2) ** 2).mean(dim=-1) # norm / C * H * W
-    
-    def forward_layer(self, x1, x2, dist_fn=torch.abs):
-        x1, x2 = [einx.id('... c h w -> ... (c h w)', k) for k in (x1, x2)]
+        if m is None or self.mask_threshold is None:
+            return dist_fn(x1 - x2).mean()  # norm / C * H * W
         
-        return self.distance(x1, x2, dist_fn=dist_fn)
+        eps = 1e-12
+        mask_threshold = self.mask_threshold
+        if mask_threshold == 'mean_max':
+            mask_threshold = 0.4 * m.mean() + 0.6 * m.max()
+        elif mask_threshold == 'mean_std':
+            mask_threshold = m.mean() + m.std()
+        
+        # print(0, m.mean(), m.std())
+        m = (m > mask_threshold).float()
+        # print(1, m.mean(), m.std())
+        return (dist_fn(x1 - x2) * m).sum(dim=-1) / (m.sum(dim=-1) + eps)  # norm / C * H * W
+        
+        # return ((x1 - x2) ** 2).mean(dim=-1)  # norm / C * H * W
     
-    def forward(self, input, target, use_raw_distance=True):
+    def forward_layer(self, x1, x2, m, dist_fn=torch.abs):
+        x1, x2, m = [einx.id('... c h w -> ... (c h w)', k) if k is not None else None for k in (x1, x2, m)]
+        
+        return self.distance(x1, x2, m, dist_fn=dist_fn)
+    
+    def forward(self, input, target, mask=None, use_raw_distance=True):
         losses = []
-
+        
+        mask = mask.float() if mask is not None else None
+        
+        if self.input_type != 'image':
+            input, target, mask = [einx.id('... c2 h w -> (... c2) c h w', t, c=3) for t in (input, target, mask)]
+        
         # This is not the best for depth bc it cant propagate to the middle layers
         if self.is_diff:
             input = input - target
             target = torch.zeros_like(input)
         
-        input, target = [einx.id('... c h w -> (...) c h w', k) for k in (input, target)]
+        if self.mask_threshold is None:
+            mask = None
         
-        x1, x2 = input, target
+        input, target, mask = [einx.id('... c h w -> (...) c h w', k) if k is not None else None for k in (input, target, mask)]
+        
+        x1, x2, m = input, target, mask
         if use_raw_distance:
-            losses.append(self.forward_layer(x1, x2, dist_fn=self.dist_fn_raw))
+            losses.append(self.forward_layer(x1, x2, m, dist_fn=self.dist_fn_raw))
         
         if 'default' in self.transforms_type:
             # Pads with zeros to make it square
-            x1, x2 = [VF.center_crop(t, max(t.shape[-1], t.shape[-2])) for t in (input, target)]
+            x1, x2, m = [VF.center_crop(t, max(t.shape[-1], t.shape[-2])) if t is not None else None for t in (x1, x2, m)]
         x1, x2 = self.transforms(x1, x2)
+        m = None if mask is None else self.base_transforms(m)
         
-        for l in self.layers:
+        for i, l in enumerate(self.layers):
             x1, x2 = l(x1), l(x2)
-            losses.append(self.forward_layer(x1, x2, dist_fn=self.dist_fn))
-        
-        # TODO test with classifier layer
-        # losses.append(self.distance(self.classifier_layer(x1), self.classifier_layer(x2), dist_fn=self.dist_fn))
+            m = self.mask_layers[i](m) if mask is not None else None
+            losses.append(self.forward_layer(x1, x2, m, dist_fn=self.dist_fn))
         
         weights = self.layer_weights if use_raw_distance else self.layer_weights[1:]
         weights = weights / weights.sum() # Normalizes weights

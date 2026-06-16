@@ -32,11 +32,9 @@ class EvalMetrics(nn.Module):
         def compute_batch_metric(t1, t2, metric):
             r = metric(*[einx.id('... c h w -> (...) c h w', t) for t in (t1, t2)])
             return r.reshape(t1.shape[:-3])
-        
-        valid_depth_count = reduce(einx.sum, valid_depth_masks.float())
 
-        def reduce_mean_depth(t):
-            return reduce(einx.sum, torch.where(valid_depth_masks, t, 0.0)) / valid_depth_count
+        def reduce_mean_depth(t, mask=valid_depth_masks):
+            return reduce(einx.sum, torch.where(mask, t, 0.0)) / reduce(einx.sum, mask.float())
         
         diff = images - images_gt
         
@@ -46,6 +44,8 @@ class EvalMetrics(nn.Module):
         images_psnr = -10.0 * torch.log10(images_mse)
         images_ssim = compute_batch_metric(images_clamped, images_gt, self.ssim)
         images_lpips = compute_batch_metric(images_clamped, images_gt, self.lpips) # normalize=True already normalizes to (-1, 1) range
+        
+        pos_valid_depth_mask = valid_depth_masks & (depths > 0)
         
         # these need to be masked later
         depths_log = depths.log()
@@ -61,15 +61,14 @@ class EvalMetrics(nn.Module):
         
         depths_mse = reduce_mean_depth(diff ** 2)
         depths_rmse = depths_mse.sqrt()
-        depths_rmse_log = reduce_mean_depth(log_diff ** 2).sqrt()
+        depths_rmse_log = reduce_mean_depth(log_diff ** 2, mask=pos_valid_depth_mask).sqrt()
         
         depths_delta_1_25 = reduce_mean_depth((threshold < 1.25).float())
         depths_delta_1_25_2 = reduce_mean_depth((threshold < 1.25 ** 2).float())
         depths_delta_1_25_3 = reduce_mean_depth((threshold < 1.25 ** 3).float())
         
-        ldsm = reduce_mean_depth(log_diff ** 2)
-        ldm = reduce_mean_depth(log_diff)
-        ldms = ldm ** 2
+        ldsm = reduce_mean_depth(log_diff ** 2, mask=pos_valid_depth_mask)
+        ldms = reduce_mean_depth(log_diff, mask=pos_valid_depth_mask) ** 2
         depths_silog_raw = ldsm - ldms
         depths_silog = 100.0 * depths_silog_raw.sqrt()
         # SNR = mean^2 / std^2
@@ -81,7 +80,7 @@ class EvalMetrics(nn.Module):
         
         depths_log_10 = depths.log10()
         depths_gt_log_10 = depths_gt.log10()
-        depths_mean_log10 = reduce_mean_depth((depths_log_10 - depths_gt_log_10).abs())
+        depths_mean_log10 = reduce_mean_depth((depths_log_10 - depths_gt_log_10).abs(), mask=pos_valid_depth_mask)
         
         image_metrics = edict(
             mse=images_mse,

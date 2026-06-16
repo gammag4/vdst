@@ -155,6 +155,8 @@ train:
         interpolation: nearest
         input_type: norm_log_depth
         is_diff: true
+        # Threshold for depth mask, can be either in 0-1 range, or < 0 or null to allow all values or 'mean_std' for mean + 1.0*std or 'mean_max' for 0.4*mean + 0.6*max
+        mask_threshold: mean_std
     # SILog loss config
     silog:
       # How much to penalize absolute scale errors
@@ -207,7 +209,12 @@ model:
   d_range: [0.01, 1000.0] # 1cm to 1km
   # Type of normalization for images and depths
   # Can be either 'standardize' (standardizes depths to to mean 0 std 1) 'min_max' (normalizes depth to min-max range) or null
-  depth_normalization_type: min_max
+  depth_normalization_type: null
+  # Output used for image, can be either 'linear' or 'sigmoid'
+  image_output_type: linear
+  # Output used for normalized depth before denormalizing it, can be either 'linear' or 'sigmoid'
+  # If depth_normalization_type is not 'min_max', this is ignored
+  norm_depth_output_type: linear
   # Enable/disable activation checkpointing
   use_activation_checkpointing: true
 

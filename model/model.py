@@ -19,6 +19,8 @@ class VDST(nn.Module):
         self.config = config
         
         assert self.config.depth_normalization_type in [None, 'standardize', 'min_max'], f'Invalid depth normalization "{self.config.depth_normalization_type}"'
+        assert self.config.image_output_type in ['linear', 'sigmoid'], f'Invalid image output type "{self.config.image_output_type}"'
+        assert self.config.norm_depth_output_type in ['linear', 'sigmoid'], f'Invalid norm depth output type "{self.config.norm_depth_output_type}"'
         
         self.dmin, self.dmax = self.config.d_range
         
@@ -99,13 +101,21 @@ class VDST(nn.Module):
     
     def denormalize_targets(self, images, depths, normalization_factors):
         eps = 1e-8
+        norm_depths = None
         
-        images = torch.sigmoid(images)
+        if self.config.image_output_type == 'sigmoid':
+            images = torch.sigmoid(images)
+        else:
+            images = (images + 1.0) * 0.5
         
         if self.config.depth_normalization_type == 'min_max':
-            depths = torch.sigmoid(depths)
-            # depths = (depths + 1.0) * 0.5
-            depths = denormalize_depths(depths, self.dmin, self.dmax)
+            if self.config.norm_depth_output_type == 'sigmoid':
+                # Seems to be worse with sigmoid
+                norm_depths = torch.sigmoid(depths)
+            else:
+                norm_depths = (depths + 1.0) * 0.5
+            
+            depths = denormalize_depths(norm_depths, self.dmin, self.dmax)
         else:
             if self.config.depth_normalization_type == 'standardize':
                 dmean, dstd = normalization_factors
@@ -113,14 +123,15 @@ class VDST(nn.Module):
             
             depths = depths.exp()
         
-        return images, depths
+        return images, depths, norm_depths
     
     # Shape: (B, F, C, H, W)
     def forward(self, scene):
         sources, targets = scene.sources, scene.targets
         targets_hw = (targets.images if targets.images is not None else sources.images).shape[-2:]
-        sources_images, sources_depths, normalization_factors = self.normalize_sources(sources.images, sources.depths)
         sources_depth_masks, targets_depth_masks = [(t.depth_masks & ((t.depths > self.dmin) & (t.depths < self.dmax))) for t in (sources, targets)]
+        sources_depths, targets.depths = [torch.clamp(t, min=self.dmin, max=self.dmax) for t in (sources.depths, targets.depths)]
+        sources_images, sources_depths, normalization_factors = self.normalize_sources(sources.images, sources_depths)
         
         sources = edict(
             K=sources.K,
@@ -178,7 +189,7 @@ class VDST(nn.Module):
         ]
         out_images, out_depths = [t[..., pad[2]:t.shape[-2]-pad[3], pad[0]:t.shape[-1]-pad[1]] for t in (out_images_padded, out_depths_padded)]
         
-        gen_images, gen_depths = self.denormalize_targets(out_images, out_depths, normalization_factors)
+        gen_images, gen_depths, gen_norm_depths = self.denormalize_targets(out_images, out_depths, normalization_factors)
         gen_targets = edict(
             K=targets.K,
             R=targets.R,
@@ -186,6 +197,7 @@ class VDST(nn.Module):
             hw=targets_hw,
             images=gen_images,
             depths=gen_depths,
+            norm_depths=gen_norm_depths,
             # depth_masks=gen_depth_masks # TODO maybe gen this
         )
         

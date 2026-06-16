@@ -138,6 +138,7 @@ def load_experiments_config(path, experiments_path, cli_args):
                 config.train.logger.run_name = name
                 config.train.checkpoints.path = os.path.join(setup_config.out_path, group_name, name)
                 config.train.n_real_steps = total_experiment_steps
+                config.train.delete_last_checkpoint = setup_config.delete_last_checkpoint
 
                 config_raw = edict_to_dict(config)
                 config = process_config(config)

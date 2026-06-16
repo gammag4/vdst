@@ -48,6 +48,10 @@ class DistributedTrainer(ABC):
     @property
     def is_last(self):
         return self.current_step == self.n_real_steps - 1
+
+    @property
+    def has_ended_training(self):
+        return self.current_step >= self.n_real_steps - 1
     
     @property
     def is_main_process(self):
@@ -156,13 +160,25 @@ class DistributedTrainer(ABC):
         
         torch.accelerator.synchronize(self.device)
         
-        model_checkpoint_path = os.path.join(config.path, 'checkpoints', f'{self.current_step}.pt')
+        model_checkpoints_path = os.path.join(config.path, 'checkpoints')
+        model_checkpoint_path = os.path.join(model_checkpoints_path, f'{self.current_step}.pt')
+        train_checkpoints_path = os.path.join(config.path, 'train_checkpoints')
+        train_checkpoint_path = os.path.join(train_checkpoints_path, f'{self.current_step}.pt')
+        
+        old_checkpoints = []
+        if self.config.train.delete_last_checkpoint:
+            old_checkpoints = [os.path.join(p, i) for p in (model_checkpoints_path, train_checkpoints_path) for i in os.listdir(p)]
+            old_checkpoints = [i for i in old_checkpoints if i not in [model_checkpoint_path, train_checkpoint_path]]
+        
         torch.save(self.model.module.state_dict(), model_checkpoint_path)
         self.logger.message(f'Saved trained model at {model_checkpoint_path}')
         
-        train_checkpoint_path = os.path.join(config.path, 'train_checkpoints', f'{self.current_step}.pt')
         torch.save(self.state_dict(), train_checkpoint_path)
         self.logger.message(f'Saved training data at {train_checkpoint_path}')
+        
+        if self.config.train.delete_last_checkpoint and os.path.isfile(model_checkpoint_path) and os.path.isfile(train_checkpoint_path):
+            for c in old_checkpoints:
+                os.remove(c)
     
     @abstractmethod
     def _run_forward(self, batch):
@@ -382,7 +398,7 @@ class DistributedTrainer(ABC):
         self._try_load_checkpoint()
         
         # Already ran
-        if self.is_last:
+        if self.has_ended_training:
             run = f'{self.config.train.logger.project_name} - {self.config.train.logger.run_group_name} - {self.config.train.logger.run_name}'
             print(f'Already ran "{run}", skipping...\n')
             return

@@ -21,6 +21,8 @@ setup:
   total_experiment_steps: [10, 100, 1000, 5000, 10000, 20000]
   use_seed_model: true
   seed_model_steps: 40000
+  # Whether to keep older checkpoints saved or to delete them when a newer one is saved
+  delete_last_checkpoint: true
 
 experiments:
   # spatial_pixel:

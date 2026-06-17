@@ -4,6 +4,7 @@ import asyncio
 import argparse
 from dotenv import load_dotenv
 import torch
+import torch.distributed as dist
 import gc
 
 from utils.config import load_config, load_experiments_config
@@ -28,32 +29,36 @@ async def main():
     args = parser.parse_args()
     
     load_dotenv()
-    
-    if args.experiments:
-        experiments, setup_config, seed_model_config = load_experiments_config(args.config, args.experiments, args.other)
-        
-        os.makedirs(setup_config.out_path, exist_ok=True)
-        
-        if seed_model_config is not None:
-            config, config_raw = seed_model_config
-            await run_experiment(config, config_raw)
-        
-        print('Running experiments ...\n')
-        
-        for config, config_raw in experiments:
-            if seed_model_config is not None:
-                seed_model_path, path = [os.path.join(i.train.checkpoints.path, 'checkpoints') for i in (seed_model_config[0], config)]
-                last_seed_model_checkpoint = os.path.join(seed_model_path, sorted(os.listdir(seed_model_path), key=lambda x: int(x.split('.')[0]))[-1])
-                checkpoint_destination = os.path.join(path, '0.pt')
-                os.makedirs(os.path.split(checkpoint_destination)[0], exist_ok=True)
-                shutil.copy(last_seed_model_checkpoint, checkpoint_destination)
+
+    try:
+        if args.experiments:
+            experiments, setup_config, seed_model_config = load_experiments_config(args.config, args.experiments, args.other)
             
+            os.makedirs(setup_config.out_path, exist_ok=True)
+            
+            if seed_model_config is not None:
+                config, config_raw = seed_model_config
+                await run_experiment(config, config_raw)
+            
+            print('Running experiments ...\n')
+            
+            for config, config_raw in experiments:
+                if seed_model_config is not None:
+                    seed_model_path, path = [os.path.join(i.train.checkpoints.path, 'checkpoints') for i in (seed_model_config[0], config)]
+                    last_seed_model_checkpoint = os.path.join(seed_model_path, sorted(os.listdir(seed_model_path), key=lambda x: int(x.split('.')[0]))[-1])
+                    checkpoint_destination = os.path.join(path, '0.pt')
+                    os.makedirs(os.path.split(checkpoint_destination)[0], exist_ok=True)
+                    shutil.copy(last_seed_model_checkpoint, checkpoint_destination)
+                
+                await run_experiment(config, config_raw)
+            
+            print('\nExperiments ended.')
+        else:
+            config, config_raw = load_config(args.config, args.other)
             await run_experiment(config, config_raw)
-        
-        print('\nExperiments ended.')
-    else:
-        config, config_raw = load_config(args.config, args.other)
-        await run_experiment(config, config_raw)
+    finally:
+        if dist.is_initialized():
+            dist.destroy_process_group()
 
 
 if __name__ == '__main__':

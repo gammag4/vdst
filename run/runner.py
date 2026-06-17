@@ -49,17 +49,14 @@ def init_distributed(config):
     # This prevents hangs or excessive memory usage on GPU:0
     torch.accelerator.set_device_index(config.distributed.local_rank)
 
-    # Creates process group
-    # `backend` is the backend used for inter-GPU communication (will be 'nccl' when device is 'cuda')
-    # When using torchrun, we don't need to specify rank and world size since it already handles this for us
-    # There are two ways to initialize process group: TCP and shared file-system. See both here: https://docs.pytorch.org/docs/stable/distributed.html#tcp-initialization
-    # See backends here: https://docs.pytorch.org/docs/stable/distributed.html#backends
-    backend = torch.distributed.get_default_backend_for_device(config.distributed.device)
-    dist.init_process_group(backend=backend, timeout=datetime.timedelta(seconds=config.distributed.timeout))
-
-
-def end_distributed():
-    dist.destroy_process_group()
+    if not dist.is_initialized():
+        # Creates process group
+        # `backend` is the backend used for inter-GPU communication (will be 'nccl' when device is 'cuda')
+        # When using torchrun, we don't need to specify rank and world size since it already handles this for us
+        # There are two ways to initialize process group: TCP and shared file-system. See both here: https://docs.pytorch.org/docs/stable/distributed.html#tcp-initialization
+        # See backends here: https://docs.pytorch.org/docs/stable/distributed.html#backends
+        backend = torch.distributed.get_default_backend_for_device(config.distributed.device)
+        dist.init_process_group(backend=backend, timeout=datetime.timedelta(seconds=config.distributed.timeout))
 
 
 async def run_distributed(config, run_async_fn):
@@ -69,7 +66,4 @@ async def run_distributed(config, run_async_fn):
 
     init_distributed(setup_config)
 
-    try:
-        return await run_async_fn()
-    finally:
-        end_distributed()
+    return await run_async_fn()

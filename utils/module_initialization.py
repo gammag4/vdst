@@ -10,7 +10,7 @@ def _init_weights(module, std=0.02):
 
 
 def init_module_weights(module, std=0.02):
-    module.apply(_init_weights)
+    module.apply(lambda m: _init_weights(m, std))
 
 
 def init_transformer_weights(transformer, std=0.02):

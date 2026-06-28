@@ -39,13 +39,13 @@ setup:
 
 train:
   # How many train steps to run in each epoch
-  n_steps: 500000
+  n_steps: 400000
   # For experiments
   n_real_steps: null
   # Display logs every n steps
   display_log_steps_interval: 10
   # Do evaluation and save results after every n steps
-  val_steps_interval: 100
+  val_steps_interval: 500
 
   # Power law fitting settings
   metric_power_law_fitting:
@@ -85,7 +85,7 @@ train:
 
   logger:
     project_name: VDST
-    run_group_name: null
+    run_group_name: vdst
     run_name: vdst
 
   checkpoints:
@@ -94,7 +94,7 @@ train:
     # Whether to load only weights, should be false only for checkpoints from trusted sources
     weights_only: false
     # Save checkpoints after every n steps (forward/backward pass)
-    checkpoint_steps_interval: 1000
+    checkpoint_steps_interval: 10000
 
   data:
     # Num workers per GPU
@@ -120,8 +120,9 @@ train:
   loss:
     # image_mse, image_perceptual, depth_silog, depth_multiscale, depth_perceptual
     # weights: [3.0, 0.5, 1.0, 1.0, 0.4]
-    weights: [2.0, 1.0, 1.0, 1.0, 1.0]
+    # weights: [2.0, 1.0, 1.0, 1.0, 1.0]
     # weights: [0.5, 1.0, 0.5, 1.0, 0.5]
+    weights: [2.0, 4.2, 0.07, 0.5, 0.16]
     should_normalize_weights: true
     # Perceptual loss config
     perceptual:
@@ -153,7 +154,7 @@ train:
         weights: null
         type: convnext
         interpolation: nearest
-        input_type: norm_log_depth
+        input_type: log_depth
         is_diff: true
         # Threshold for depth mask, can be either in 0-1 range, or < 0 or null to allow all values or 'mean_std' for mean + 1.0*std or 'mean_max' for 0.4*mean + 0.6*max
         mask_threshold: mean_std
@@ -209,7 +210,7 @@ model:
   d_range: [0.01, 1000.0] # 1cm to 1km
   # Type of normalization for images and depths
   # Can be either 'standardize' (standardizes depths to to mean 0 std 1) 'min_max' (normalizes depth to min-max range) or null
-  depth_normalization_type: null
+  depth_normalization_type: standardize
   # Output used for image, can be either 'linear' or 'sigmoid'
   image_output_type: linear
   # Output used for normalized depth before denormalizing it, can be either 'linear' or 'sigmoid'

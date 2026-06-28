@@ -1,30 +1,34 @@
 overrides:
-  model:
-    depth_input_type: depth
-    enc_layer_norm: false
-    enc_residual_layer_norm: false
-    dec_layer_norm: false
-    dec_residual_layer_norm: false
-  train:
-    n_steps: 500000
+  setup:
+    seed: 42
+  # train:
+  #   n_steps: 200000
+  #   val_steps_interval: 100
 
-    loss:
-      weights: [2.0,2.0,0.7,1.5,1.0]
-      perceptual:
-        scheduler: constant
-    optimizer:
-      lr: 1e-4 # For now the best was 1e-4
-      n_warmup_steps: 3000
+  #   loss:
+  #     perceptual:
+  #       scheduler: constant
+  #   optimizer:
+  #     betas: [0.9996, 0.9996]
+
+  #   checkpoints:
+  #     checkpoint_steps_interval: 1000
 
 setup:
   out_path: results/experiments/
-  total_experiment_steps: [10, 100, 1000, 5000, 10000, 20000]
-  use_seed_model: true
+  # Can be either a number which will tell how many steps to run or a list of numbers which will make it run all experiments until that number then repeat for the next and so on
+  total_experiment_steps: null #[10, 100, 1000, 5000, 10000, 20000]
+  use_seed_model: false
   seed_model_steps: 40000
   # Whether to keep older checkpoints saved or to delete them when a newer one is saved
   delete_last_checkpoint: true
 
 experiments:
+  vdst:
+    vdst:
+      setup:
+        seed: 42
+
   # spatial_pixel:
   #   VDST:
   #     train:
@@ -63,116 +67,6 @@ experiments:
   #         output_dims: [64, 64]
   #         train_batch_size: 8
   #         val_batch_size: 8
-  d percep interp nearest:
-    # log depth n log loss:
-    #   train:
-    #     loss:
-    #       weights: [0.0,0.0,0.08,0.0,1.0]
-    #       perceptual:
-    #         depth:
-    #           input_type: log_depth
-    #           is_diff: false
-    # log depth n norm log loss:
-    #   train:
-    #     loss:
-    #       weights: [0.0,0.0,0.08,0.0,1.0]
-    #       perceptual:
-    #         depth:
-    #           input_type: norm_log_depth
-    #           is_diff: false
-    log depth n norm log diff loss:
-      train:
-        loss:
-          weights: [0.0,0.0,0.08,0.0,1.0]
-          perceptual:
-            depth:
-              input_type: norm_log_depth
-      model:
-        depth_normalization_type: null
-    log depth n log diff loss:
-      train:
-        loss:
-          weights: [0.0,0.0,0.08,0.0,1.0]
-          perceptual:
-            depth:
-              input_type: log_depth
-      model:
-        depth_normalization_type: null
-    # log depth n norm log diff loss interp bilinear:
-    #   train:
-    #     loss:
-    #       weights: [0.0,0.0,0.08,0.0,1.0]
-    #       perceptual:
-    #         depth:
-    #           input_type: norm_log_depth
-    #           interpolation: default
-    log depth n norm log diff loss first percep layers:
-      train:
-        loss:
-          weights: [0.0,0.0,0.08,0.0,1.0]
-          perceptual:
-            depth:
-              weights: [2.0, 1.0, 1.0, 1.0, 0.7, 0.3, 0.0, 0.0, 0.0]
-              input_type: norm_log_depth
-      model:
-        depth_normalization_type: null
-    log depth n log diff loss first percep layers:
-      train:
-        loss:
-          weights: [0.0,0.0,0.08,0.0,1.0]
-          perceptual:
-            depth:
-              weights: [2.0, 1.0, 1.0, 1.0, 0.7, 0.3, 0.0, 0.0, 0.0]
-              input_type: log_depth
-      model:
-        depth_normalization_type: null
-    norm log depth n norm log diff loss:
-      train:
-        loss:
-          weights: [0.0,0.0,0.08,0.0,1.0]
-          perceptual:
-            depth:
-              input_type: norm_log_depth
-      model:
-        depth_normalization_type: min_max
-    norm log depth n log diff loss:
-      train:
-        loss:
-          weights: [0.0,0.0,0.08,0.0,1.0]
-          perceptual:
-            depth:
-              input_type: log_depth
-      model:
-        depth_normalization_type: min_max
-    no d percep:
-      train:
-        loss:
-          weights: [0.0,0.0,0.08,0.0,0.0]
-  # d percep arch:
-  #   convnext stand norm:
-  #     train:
-  #       loss:
-  #         weights: [0.0,0.0,0.08,0.0,1.0]
-  #         perceptual:
-  #           depth:
-  #             type: convnext
-  #             transforms: standardize
-  #   convnext norm only:
-  #     train:
-  #       loss:
-  #         weights: [0.0,0.0,0.08,0.0,1.0]
-  #         perceptual:
-  #           depth:
-  #             type: convnext
-  #             transforms: normalize
-  #   convnext def 224:
-  #     train:
-  #       loss:
-  #         weights: [0.0,0.0,0.08,0.0,1.0]
-  #         perceptual:
-  #           depth:
-  #             type: convnext
-  #             transforms: default_size_224
 
 old_experiments:
   lr:
@@ -275,14 +169,14 @@ old_experiments:
           weights: [2.0,2.0,0.0,0.0,0.0]
           perceptual:
             type: convnext
-            transforms: standardize_normalize
+            transforms: standardize
     convnext norm only:
       train:
         loss:
           weights: [2.0,2.0,0.0,0.0,0.0]
           perceptual:
             type: convnext
-            transforms: normalize_only
+            transforms: normalize
     vgg def:
       train:
         loss:
@@ -325,3 +219,319 @@ old_experiments:
           perceptual:
             type: convnext
             transforms: default_size_236
+
+old exps 2:
+  d percep interp nearest:
+    # log depth n log loss:
+    #   train:
+    #     loss:
+    #       weights: [0.0,0.0,0.08,0.0,1.0]
+    #       should_normalize_weights: false
+    #       perceptual:
+    #         depth:
+    #           input_type: log_depth
+    #           is_diff: false
+    # log depth n norm log loss:
+    #   train:
+    #     loss:
+    #       weights: [0.0,0.0,0.08,0.0,1.0]
+    #       should_normalize_weights: false
+    #       perceptual:
+    #         depth:
+    #           input_type: norm_log_depth
+    #           is_diff: false
+    log depth n log diff loss:
+      train:
+        loss:
+          weights: [0.0,0.0,0.08,0.0,1.0]
+          should_normalize_weights: false
+          perceptual:
+            depth:
+              input_type: log_depth
+      model:
+        depth_normalization_type: null
+    log depth n norm log diff loss:
+      train:
+        loss:
+          weights: [0.0,0.0,0.08,0.0,1.0]
+          should_normalize_weights: false
+          perceptual:
+            depth:
+              input_type: norm_log_depth
+      model:
+        depth_normalization_type: null
+    # log depth n norm log diff loss interp bilinear:
+    #   train:
+    #     loss:
+    #       weights: [0.0,0.0,0.08,0.0,1.0]
+    #       should_normalize_weights: false
+    #       perceptual:
+    #         depth:
+    #           input_type: norm_log_depth
+    #           interpolation: default
+    # log depth n norm log diff loss first percep layers:
+    #   train:
+    #     loss:
+    #       weights: [0.0,0.0,0.08,0.0,1.0]
+    #       should_normalize_weights: false
+    #       perceptual:
+    #         depth:
+    #           weights: [2.0, 1.0, 1.0, 1.0, 0.7, 0.3, 0.0, 0.0, 0.0]
+    #           input_type: norm_log_depth
+    #   model:
+    #     depth_normalization_type: null
+    # log depth n log diff loss first percep layers:
+    #   train:
+    #     loss:
+    #       weights: [0.0,0.0,0.08,0.0,1.0]
+    #       should_normalize_weights: false
+    #       perceptual:
+    #         depth:
+    #           weights: [2.0, 1.0, 1.0, 1.0, 0.7, 0.3, 0.0, 0.0, 0.0]
+    #           input_type: log_depth
+    #   model:
+    #     depth_normalization_type: null
+    norm log depth n norm log diff loss:
+      train:
+        loss:
+          weights: [0.0,0.0,0.08,0.0,1.0]
+          should_normalize_weights: false
+          perceptual:
+            depth:
+              input_type: norm_log_depth
+      model:
+        depth_normalization_type: min_max
+    norm log depth n log diff loss:
+      train:
+        loss:
+          weights: [0.0,0.0,0.08,0.0,1.0]
+          should_normalize_weights: false
+          perceptual:
+            depth:
+              input_type: log_depth
+      model:
+        depth_normalization_type: min_max
+    no d percep:
+      train:
+        loss:
+          weights: [0.0,0.0,0.08,0.0,0.0]
+          should_normalize_weights: false
+  d percep arch:
+    convnext stand norm:
+      train:
+        loss:
+          weights: [0.0,0.0,0.08,0.0,1.0]
+          should_normalize_weights: false
+          perceptual:
+            depth:
+              type: convnext
+              transforms: standardize
+    convnext norm only:
+      train:
+        loss:
+          weights: [0.0,0.0,0.08,0.0,1.0]
+          should_normalize_weights: false
+          perceptual:
+            depth:
+              type: convnext
+              transforms: normalize
+    convnext def 224:
+      train:
+        loss:
+          weights: [0.0,0.0,0.08,0.0,1.0]
+          should_normalize_weights: false
+          perceptual:
+            depth:
+              type: convnext
+              transforms: default_size_224
+  i percep type:
+    i percep images:
+      train:
+        loss:
+          weights: [2.0,2.0,0.0,0.0,0.0]
+          perceptual:
+            image:
+              is_diff: false
+    i percep image diffs:
+      train:
+        loss:
+          weights: [2.0,2.0,0.0,0.0,0.0]
+          perceptual:
+            image:
+              is_diff: true
+  d percep masking:
+    # d percep vgg w mask 0_7 thresh:
+    #   train:
+    #     loss:
+    #       weights: [0.0,0.0,0.08,0.0,1.0]
+    #       should_normalize_weights: false
+    #       perceptual:
+    #         image:
+    #           type: vgg2
+    #         depth:
+    #           mask_threshold: 0.7
+    #           type: vgg2
+    d percep w mask mean max thresh:
+      train:
+        loss:
+          weights: [0.0,0.0,0.08,0.0,0.4]
+          should_normalize_weights: false
+          perceptual:
+            depth:
+              mask_threshold: mean_max
+    d percep w mask mean std thresh:
+      train:
+        loss:
+          weights: [0.0,0.0,0.08,0.0,0.19]
+          should_normalize_weights: false
+          perceptual:
+            depth:
+              mask_threshold: mean_std
+    d percep w mask 0_5 thresh:
+      train:
+        loss:
+          weights: [0.0,0.0,0.08,0.0,0.12]
+          should_normalize_weights: false
+          perceptual:
+            depth:
+              mask_threshold: 0.5
+    d percep w mask 0 thresh:
+      train:
+        loss:
+          weights: [0.0,0.0,0.08,0.0,0.29]
+          should_normalize_weights: false
+          perceptual:
+            depth:
+              mask_threshold: null
+              # mask_threshold: -0.1
+    # no d percep:
+    #   train:
+    #     loss:
+    #       weights: [0.0,0.0,0.08,0.0,0.0]
+    #       should_normalize_weights: false
+
+  d percep norm type:
+    no d percep:
+      train:
+        loss:
+          weights: [2.0,4.2,1.35,0.0,0.0]
+          should_normalize_weights: false
+      model:
+        depth_normalization_type: null
+    stand log depth n log diff loss:
+      train:
+        loss:
+          weights: [2.0,4.2,0.08,0.0,0.19]
+          should_normalize_weights: false
+          perceptual:
+            depth:
+              input_type: log_depth
+      model:
+        depth_normalization_type: standardize
+    stand log depth n norm log diff loss:
+      train:
+        loss:
+          weights: [2.0,4.2,0.08,0.0,0.16]
+          should_normalize_weights: false
+          perceptual:
+            depth:
+              input_type: norm_log_depth
+      model:
+        depth_normalization_type: standardize
+    log depth n log diff loss:
+      train:
+        loss:
+          weights: [2.0,4.2,0.08,0.0,0.19]
+          should_normalize_weights: false
+          perceptual:
+            depth:
+              input_type: log_depth
+      model:
+        depth_normalization_type: null
+    linear norm log depth n log diff loss:
+      train:
+        loss:
+          weights: [2.0,4.2,0.08,0.0,0.1]
+          should_normalize_weights: false
+          perceptual:
+            depth:
+              input_type: log_depth
+      model:
+        image_output_type: linear
+        norm_depth_output_type: linear
+        depth_normalization_type: min_max
+    sigmoid norm log depth n log diff loss:
+      train:
+        loss:
+          weights: [2.0,4.2,0.08,0.0,0.12]
+          should_normalize_weights: false
+          perceptual:
+            depth:
+              input_type: log_depth
+      model:
+        image_output_type: sigmoid
+        norm_depth_output_type: sigmoid
+        depth_normalization_type: min_max
+    log depth n norm log diff loss:
+      train:
+        loss:
+          weights: [2.0,4.2,0.08,0.0,0.16]
+          should_normalize_weights: false
+          perceptual:
+            depth:
+              input_type: norm_log_depth
+      model:
+        depth_normalization_type: null
+    linear norm log depth n norm log diff loss:
+      train:
+        loss:
+          weights: [2.0,4.2,0.08,0.0,0.07]
+          should_normalize_weights: false
+          perceptual:
+            depth:
+              input_type: norm_log_depth
+      model:
+        image_output_type: linear
+        norm_depth_output_type: linear
+        depth_normalization_type: min_max
+    sigmoid norm log depth n norm log diff loss:
+      train:
+        loss:
+          weights: [2.0,4.2,0.08,0.0,0.08]
+          should_normalize_weights: false
+          perceptual:
+            depth:
+              input_type: norm_log_depth
+      model:
+        image_output_type: sigmoid
+        norm_depth_output_type: sigmoid
+        depth_normalization_type: min_max
+  d losses:
+    silog + mscale grad + d percep:
+      train:
+        loss:
+          weights: [0.0,0.0,0.07,0.5,0.16]
+          should_normalize_weights: false
+      model:
+        depth_normalization_type: standardize
+    silog + mscale grad:
+      train:
+        loss:
+          weights: [0.0,0.0,0.28,2.02,0.0]
+          should_normalize_weights: false
+      model:
+        depth_normalization_type: standardize
+    silog + d percep:
+      train:
+        loss:
+          weights: [0.0,0.0,0.08,0.0,0.19]
+          should_normalize_weights: false
+      model:
+        depth_normalization_type: standardize
+    silog:
+      train:
+        loss:
+          weights: [0.0,0.0,1.35,0.0,0.0]
+          should_normalize_weights: false
+      model:
+        depth_normalization_type: standardize

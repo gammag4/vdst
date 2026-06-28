@@ -60,6 +60,8 @@ def get_image(path, is_depth, output_dims):
         new_dim = max(output_dims[0], round(new_dim))
         new_shape = (new_dim, output_dims[1])
     
+    # CV2 resize shape is (w, h)
+    new_shape = new_shape[::-1]
     if is_depth:
         img = cv2.resize(img, new_shape, interpolation=cv2.INTER_NEAREST)
         img = img[:, :, None]
@@ -73,7 +75,7 @@ def get_image(path, is_depth, output_dims):
     img = torch.from_numpy(img)
     img = einx.id('h w c -> c h w', img)
     img = VF.center_crop(img, output_size=output_dims)
-    new_center_displacement = (img.shape[0] / 2 - before_crop_dim[0] / 2, img.shape[1] / 2 - before_crop_dim[1] / 2)
+    new_center_displacement = (img.shape[-2] / 2 - before_crop_dim[-2] / 2, img.shape[-1] / 2 - before_crop_dim[-1] / 2)
     
     return img, resize_ratio, original_dim, new_center_displacement
 

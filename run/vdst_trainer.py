@@ -8,6 +8,7 @@ from torch.optim.lr_scheduler import ConstantLR, ChainedScheduler, LinearLR, Cos
 import torchvision.transforms.functional as VF
 import einx
 import matplotlib.pyplot as plt
+import shutil
 
 from utils.module_initialization import init_module_weights, init_transformer_weights
 from utils.logger import WandbLogger
@@ -18,6 +19,7 @@ from loss.loss import Loss
 from loss.scheduler import PerceptualLossScheduler
 from loss.eval_metrics import EvalMetrics
 from dataset.wildrgbd import WildRGBDDataset
+from dataset.co3d_eval import CO3DEvalDataset
 
 
 class VDSTTrainer(DistributedTrainer):
@@ -36,6 +38,10 @@ class VDSTTrainer(DistributedTrainer):
         
         if self.is_main_process:
             self.eval_metrics = EvalMetrics().to(self.device)
+        
+        self.training = True
+        self.test_dataloader = None
+        self.test_new_category_dataloader = None
     
     def state_dict(self):
         state_dict = super().state_dict()
@@ -53,7 +59,7 @@ class VDSTTrainer(DistributedTrainer):
         val_split = 0.005
         test_split = 0.02
         
-        train_dataset, val_dataset = [
+        train_dataset, val_dataset, test_dataset, test_new_category_dataset = [
             WildRGBDDataset(
                 config.datasets.wildrgbd.path,
                 config.n_sources,
@@ -66,10 +72,15 @@ class VDSTTrainer(DistributedTrainer):
                 test_category='truck',
                 seed=self.config.setup.seed
             )
-            for split in ('train', 'val')
+            for split in ('train', 'val', 'test', 'test_new_category')
         ]
         
-        return train_dataset, val_dataset
+        # val_dataset = CO3DEvalDataset(
+        #     path='/media/gabriel/6d735c7f-5832-4134-afa6-9e50454ca09c/co3d_data/co3d_eval/',
+        #     split='3'
+        # )
+        
+        return train_dataset, val_dataset, test_dataset, test_new_category_dataset
     
     def _create_loss(self, model_config, loss_config, n_steps):
         loss = Loss(model_config, loss_config)
@@ -111,15 +122,20 @@ class VDSTTrainer(DistributedTrainer):
         return WandbLogger(self.config.train.logger, self.config_raw, self.is_main_process)
     
     def _init_training(self):
-        train_dataset, val_dataset = self._create_datasets(self.config.train.data)
+        train_dataset, val_dataset, test_dataset, test_new_category_dataset = self._create_datasets(self.config.train.data)
+        train_dataloader = self._create_dataloader(train_dataset, train_dataloader=True)
+        val_dataloader = self._create_dataloader(val_dataset, train_dataloader=False)
+        self.test_dataloader = self._create_dataloader(test_dataset, train_dataloader=False)
+        self.test_new_category_dataloader = self._create_dataloader(test_new_category_dataset, train_dataloader=False)
+        
         loss, loss_scheduler = self._create_loss(self.config.model, self.config.train.loss, self.n_steps)
         model = self._create_model(self.config.model, loss)
         optimizer, lr_scheduler = self._create_optimizer(self.config.train.optimizer, model, self.n_steps)
         logger = self._create_logger()
         
         return edict(
-            train_dataset=train_dataset,
-            val_dataset=val_dataset,
+            train_dataloader=train_dataloader,
+            val_dataloader=val_dataloader,
             loss_scheduler=loss_scheduler,
             model=model,
             optimizer=optimizer,
@@ -141,6 +157,23 @@ class VDSTTrainer(DistributedTrainer):
     
     def _after_step(self):
         self._try_fit_power_law()
+        
+    def _save_val_results_scene_names(self, scenes_file_path, batch_res):
+        with open(scenes_file_path, 'a+', encoding='utf8') as f:
+            f.seek(0)
+            data = yaml.safe_load(f) or {}
+
+            data['sources'] = data.get('sources', {})
+            data['targets'] = data.get('targets', {})
+            data['scene_names'] = data.get('scene_names', []) + ['_'.join(i.split('_')[:-1]) for i in batch_res.scene_name]
+            data['sources']['images_ids'] = data['sources'].get('images_ids', []) + batch_res.sources.images_ids
+            data['sources']['depths_ids'] = data['sources'].get('depths_ids', []) + batch_res.sources.depths_ids
+            data['targets']['images_ids'] = data['targets'].get('images_ids', []) + batch_res.targets.images_ids
+            data['targets']['depths_ids'] = data['targets'].get('depths_ids', []) + batch_res.targets.depths_ids
+            
+            f.truncate(0)
+            f.seek(0)
+            yaml.safe_dump(data, f)
     
     def _save_intermediate_results(self, path, batch_index, batch_res, is_train=False):
         source_images, source_depths = batch_res.sources.images, batch_res.sources.depths
@@ -172,29 +205,35 @@ class VDSTTrainer(DistributedTrainer):
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
             cv2.imwrite(img_path, img)
             self.logger.log_image(img_path, name)
-        
-        with open(os.path.join(path, 'scenes.txt'), 'a', encoding='utf8') as f:
-            f.write('\n'.join(batch_res.scene_name) + '\n')
     
-    def _run_eval(self, data_iter):
-        path = os.path.join(self.config.train.checkpoints.path, 'intermediate_results', f'{self.current_step}')
-        os.makedirs(path, exist_ok=True)
+    def _run_eval(self, data_iter, out_path, should_log=True):
+        if self.training:
+            train_scenes_path = os.path.join(out_path, 'train_scenes.yaml')
+            if os.path.isfile(train_scenes_path):
+                os.remove(train_scenes_path)
+        val_scenes_path = os.path.join(out_path, 'val_scenes.yaml' if self.training else 'scenes.yaml')
+        val_scenes_rendered_path = os.path.join(out_path, 'val_scenes_rendered.yaml' if self.training else 'scenes_rendered.yaml')
+        if os.path.isfile(val_scenes_path):
+            os.remove(val_scenes_path)
+        if os.path.isfile(val_scenes_rendered_path):
+            os.remove(val_scenes_rendered_path)
         
-        with open(os.path.join(path, 'scenes.txt'), 'w', encoding='utf8') as f:
-            f.write('')
-        
-        should_save_intermediate_results = self.is_last or self.curr_val_step % self.intermediate_results_interval == 0
-        should_use_entire_val_dataset = self.is_last or self.curr_val_step % self.use_entire_val_datset_interval == 0
-        self.curr_val_step += 1
+        if self.training:
+            should_save_intermediate_results = self.is_last or self.curr_val_step % self.intermediate_results_interval == 0
+            should_use_entire_val_dataset = self.is_last or self.curr_val_step % self.use_entire_val_datset_interval == 0
+            self.curr_val_step += 1
+        else:
+            should_save_intermediate_results = True
+            should_use_entire_val_dataset = True
         
         # Always uses only number specified of batches for intermediate results of scenes used in training
-        if should_save_intermediate_results:
+        if self.training and should_save_intermediate_results:
             for j in range(self.intermediate_results_num_batches):
                 train_batch = []
                 for i in range(j * self.config.train.data.train_batch_size, (j + 1) * self.config.train.data.train_batch_size):
                     train_batch.append(self.train_dataloader.dataset[i])
                 
-                sources, targets = [edict({k: torch.stack([i[p][k] for i in train_batch]) for k in train_batch[0][p].keys()}) for p in ('sources', 'targets')]
+                sources, targets = [edict({k: (lambda x: torch.stack(x) if isinstance(train_batch[0][p][k], torch.Tensor) else x)([i[p][k] for i in train_batch]) for k in train_batch[0][p].keys()}) for p in ('sources', 'targets')]
                 train_batch = edict(
                     scene_name=[i.scene_name for i in train_batch],
                     sources=sources,
@@ -202,17 +241,25 @@ class VDSTTrainer(DistributedTrainer):
                 )
                 
                 train_res = self.model(train_batch)
-                self._save_intermediate_results(path, 0, train_res, is_train=True)
+                self._save_intermediate_results(out_path, 0, train_res, is_train=True)
+                self._save_val_results_scene_names(train_scenes_path, train_res)
         
         eval_metricss = []
         for i, batch in enumerate(data_iter):
             if not should_use_entire_val_dataset and i >= self.intermediate_val_num_batches:
                 break
+            
+            batch.sources.images_ids, batch.sources.depths_ids, batch.targets.images_ids, batch.targets.depths_ids = [
+                [[j[i] for j in p] for i in range(len(p[0]))]
+                for p in (batch.sources.images_ids, batch.sources.depths_ids, batch.targets.images_ids, batch.targets.depths_ids)
+            ]
             batch_res = self.model(batch)
             
             # Always uses only number specified of batches for intermediate results of validation scenes
             if should_save_intermediate_results and i < self.intermediate_results_num_batches:
-                self._save_intermediate_results(path, i, batch_res)
+                self._save_intermediate_results(out_path, i, batch_res)
+                self._save_val_results_scene_names(val_scenes_rendered_path, batch_res)
+            self._save_val_results_scene_names(val_scenes_path, batch_res)
             
             eval_metrics = self.eval_metrics(batch_res.gen_targets, batch_res.targets, valid_depth_range=self.config.model.d_range)
             eval_metrics.num_images = eval_metrics.images.psnr.numel()
@@ -224,16 +271,28 @@ class VDSTTrainer(DistributedTrainer):
         for k1 in [i for i in eval_metricss[0].keys() if i != 'num_images']:
             for k2 in eval_metricss[0][k1].keys():
                 eval_metrics[k1] = eval_metrics.get(k1, edict())
-                eval_metrics[k1][k2] = torch.concat([e[k1][k2] for e in eval_metricss], dim=0).mean().item()
+                t = [e[k1][k2] for e in eval_metricss]
+                eval_metrics[k1][k2] = torch.stack([i.sum() for i in t]).sum().item() / sum([i.numel() for i in t])
         
         eval_metrics.num_images = sum([e.num_images for e in eval_metricss])
         
-        self.logger.log({'metrics/eval': eval_metrics})
+        if should_log:
+            self.logger.log({'metrics/eval': eval_metrics})
         
-        with open(os.path.join(path, 'eval_metrics.yaml'), 'w', encoding='utf8') as f:
+        with open(os.path.join(out_path, 'eval_metrics.yaml'), 'w', encoding='utf8') as f:
             yaml.dump(edict_to_dict(eval_metrics), f, default_flow_style=False, sort_keys=True)
         
-        self.logger.message(f'Saved evaluation results at {path}')
+        if should_log:
+            self.logger.message(f'Saved evaluation results at {out_path}')
+    
+    def _post_train(self):
+        self.training = False
+        shutil.rmtree(os.path.join(self.config.train.checkpoints.path, 'final_eval'), ignore_errors=True)
+        # self._eval(self.train_dataloader, os.path.join(self.config.train.checkpoints.path, 'final_eval', 'train'), False)
+        self._eval(self.val_dataloader, os.path.join(self.config.train.checkpoints.path, 'final_eval', 'val'), False)
+        self._eval(self.test_dataloader, os.path.join(self.config.train.checkpoints.path, 'final_eval', 'test'), False)
+        self._eval(self.test_new_category_dataloader, os.path.join(self.config.train.checkpoints.path, 'final_eval', 'test_new_category'), False)
+        self.training = True # TODO remove
     
     def _run_forward(self, batch):
         res = self.model(batch)

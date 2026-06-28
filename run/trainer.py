@@ -289,17 +289,18 @@ class DistributedTrainer(ABC):
     
     # Eval step
     @abstractmethod
-    def _run_eval(self, data_iter):
+    def _run_eval(self, data_iter, out_path, should_log=True):
         pass
     
-    def _val(self):
+    def _eval(self, dataloader, out_path, should_log=True):
+        os.makedirs(out_path, exist_ok=True)
         self.model.eval()
         
-        self.val_dataloader.sampler.set_epoch(0)
+        dataloader.sampler.set_epoch(0)
         
         with amp.autocast(device_type=self.device, dtype=self.amp_config.dtype, enabled=self.amp_config.enabled), torch.no_grad():
             if self.is_main_process:
-                self._run_eval(iter(self.val_dataloader))
+                self._run_eval(iter(dataloader), out_path, should_log)
         
         self.model.train()
     
@@ -323,7 +324,8 @@ class DistributedTrainer(ABC):
         self._step()
         
         if self.is_last or self.current_step % self.config.train.val_steps_interval == 0:
-            self._val()
+            out_path = os.path.join(self.config.train.checkpoints.path, 'intermediate_results', f'{self.current_step}')
+            self._eval(self.val_dataloader, out_path)
         
         self._after_step()
         
@@ -333,7 +335,14 @@ class DistributedTrainer(ABC):
             print('')
         self.logger.end_step()
         
+        if self.is_last:
+            self._post_train()
+        
         self._try_save_checkpoint()
+    
+    @abstractmethod
+    def _post_train(self):
+        pass
     
     def _train(self):
         # Setting sampler epoch at beginning of each epoch before creating DataLoader iterator is necessary for shuffling to work in distributed mode across multiple epochs
@@ -373,8 +382,8 @@ class DistributedTrainer(ABC):
     async def run(self):
         training_args = self._init_training()
         
-        self.train_dataloader = self._create_dataloader(training_args.train_dataset, train_dataloader=True)
-        self.val_dataloader = self._create_dataloader(training_args.val_dataset, train_dataloader=False)
+        self.train_dataloader = training_args.train_dataloader
+        self.val_dataloader = training_args.val_dataloader
         self.loss_scheduler = training_args.loss_scheduler
         self.optimizer = training_args.optimizer
         self.lr_scheduler = training_args.lr_scheduler

@@ -124,6 +124,9 @@ class WildRGBDDataset(Dataset):
         sources = edict({k: v[:2] for k, v in views.items()})
         targets = edict({k: v[2:] for k, v in views.items()})
         
+        images, depths = [[os.path.split(i)[1] for i in p] for p in (images, depths)]
+        (sources.images_ids, targets.images_ids), (sources.depths_ids, targets.depths_ids) = [(p[:2], p[2:]) for p in (images, depths)]
+        
         return edict(
             scene_name=sname,
             sources=sources,

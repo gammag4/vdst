@@ -163,6 +163,8 @@ class PoseEncoder(nn.Module):
         o, d = compute_view_rays(K, R, t, pad, hw)
         
         if self.config.depth_input_type == 'spatial':
+            # TODO check if this works
+            # TODO also check if scale is right (the scale of o, d generated from K R t should be in meters too, check if o is in meters)
             depths = einx.id('b 1 h w -> b c h w', depths, c=3)
             depths = d * depths
         

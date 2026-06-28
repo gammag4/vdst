@@ -121,7 +121,7 @@ def load_experiments_config(path, experiments_path, cli_args):
 
         seed_model_config = (config, config_raw)
     
-    if isinstance(setup_config.total_experiment_steps, int):
+    if setup_config.total_experiment_steps is None or isinstance(setup_config.total_experiment_steps, int):
         setup_config.total_experiment_steps = [setup_config.total_experiment_steps]
 
     experiments = []

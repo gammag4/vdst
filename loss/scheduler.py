@@ -115,7 +115,8 @@ class PerceptualLossScheduler(LossScheduler):
         c = math.cos((perc - 1) * math.pi) / 2 + 0.5
         r = 0.2
         fall1 = (r - 1) * c + 1  # goes from 1 to r
-        fall2 = 1 - c # goes from 1 to 0
-        weights = torch.tensor([1.0, fall1, 1.0, 1.0, fall2], device=self.loss.weights.device)
+        fall2 = 1 - c  # goes from 1 to 0
+        fall3 = 1 - c  # goes from 1 to 0
+        weights = torch.tensor([1.0, fall1, 1.0, fall2, fall3], device=self.loss.weights.device)
         weights = self.original_weights * weights
         self.loss.weights.copy_(weights)

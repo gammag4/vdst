@@ -5,7 +5,22 @@ import einx
 import torchvision.transforms.functional as VF
 
 
-def normalize_depths(depths, min, max):
+def normalize_depths(depths, log_min, log_max):
+    eps = 1e-8
+    depths = (depths + eps).log()
+    depths = (depths - log_min) / (log_max - log_min)
+    
+    return depths
+
+
+def denormalize_depths(depths, log_min, log_max):
+    depths = (log_max - log_min) * depths + log_min
+    depths = depths.exp()
+    
+    return depths
+
+
+def normalize_depths2(depths, min, max):
     # TODO check if its more precise
     # depths = depths - min
     # d_range = torch.tensor(max - min)
@@ -17,7 +32,7 @@ def normalize_depths(depths, min, max):
     return depths
 
 
-def denormalize_depths(depths, min, max):
+def denormalize_depths2(depths, min, max):
     # TODO check if its more precise
     # d_range = torch.tensor(max - min)
     # depths = ((depths + d_range.log()).exp() - d_range) / (torch.e - 1.0)

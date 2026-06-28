@@ -32,27 +32,30 @@ class PerceptualLoss(nn.Module):
         
         assert interpolation in ['default', 'nearest'], f'Invalid interpolation "{interpolation}"'
         assert model_type in ['convnext', 'vgg', 'vgg2', 'vgg3'], f'Invalid model type "{model_type}"'
-        
+
+        # TODO these values were computed for d_min = 0.01 and d_max = 1000.0
+        # if the range changes, these need to be recomputed for the new range
+        # fix this so that it can be normalized for range shifts (they were computed from the formula in loss.py)
         # The stats from CO3D were estimated from the processed dataset, so they are different from the ones from the full raw dataset
         if self.input_type == 'image':
-            # Gets defaults for imagenet1k
-            data_mean, data_std = None, None
+            # Defaults for imagenet1k
+            raw_transforms = ConvNeXt_Tiny_Weights.DEFAULT.transforms()
+            data_mean, data_std = raw_transforms.mean, raw_transforms.std
         elif self.input_type == 'log_depth':
             # From CO3D
-            data_mean, data_std = -0.2749, 0.9187
+            data_mean, data_std = [-0.2749] * 3, [0.9187] * 3
         elif self.input_type == 'norm_log_depth':
             # From CO3D
-            # TODO these values were computed for d_min = 0.01 and d_max = 1000.0
-            # if the range changes, these need to be recomputed for the new range
-            # fix this so that it can be normalized for range shifts (they were computed from the formula in loss.py)
-            data_mean, data_std = 0.0020, 0.0018 #TODO i changed the normalization computation recompute this 
+            data_mean, data_std = [0.3761] * 3, [0.0798] * 3
+        # elif self.input_type == 'norm_log_depth2': # normalize_depths2 in data.py from that paper
+        #     data_mean, data_std = 0.002, 0.0018
         else:
             assert False, f'Invalid input type "{self.input_type}"'
         
-        if self.is_diff and data_mean is not None:
-            data_mean, data_std = 0.0, data_std * (2 ** 0.5)
+        if self.is_diff:
+            data_mean, data_std = [0.0] * 3, [i * (2 ** 0.5) for i in data_std]
         
-        norm_dict = dict(mean=[data_mean] * 3, std=[data_std] * 3) if data_mean is not None else None
+        norm_dict = dict(mean=data_mean, std=data_std)
         
         arch = self.cnn_archs.get(model_type, None)
         mask_arch = self.cnn_archs.get(model_type + '_mask', None) if self.input_type != 'image' else None
@@ -130,7 +133,7 @@ class PerceptualLoss(nn.Module):
             layer_weights = torch.ones(len(indices), dtype=torch.float32) if layer_weights is None else layer_weights
         
         if self.transforms_type in ['default', 'default_size_224', 'default_size_236']:
-            self.base_transforms = weights.transforms(**norm_dict) if norm_dict is not None else weights.transforms()
+            self.base_transforms = weights.transforms(**norm_dict)
             
             # resizing and cropping at same size to not lose information
             if self.transforms_type == 'default_size_224':
@@ -142,11 +145,7 @@ class PerceptualLoss(nn.Module):
                 self.base_transforms.interpolation = T.InterpolationMode.NEAREST
             
         elif self.transforms_type == 'normalize':
-            if norm_dict is None:
-                raw_transforms = weights.transforms()
-                self.base_transforms = T.Normalize(mean=raw_transforms.mean, std=raw_transforms.std)
-            else:
-                self.base_transforms = T.Normalize(**norm_dict)
+            self.base_transforms = T.Normalize(**norm_dict)
             
         elif self.transforms_type == 'standardize':
             # Using transforms in pairs allows it to standardize in comparison to ground truth, making it dependent on scale discrepancies

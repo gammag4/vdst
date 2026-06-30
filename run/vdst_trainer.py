@@ -157,12 +157,12 @@ class VDSTTrainer(DistributedTrainer):
     
     def _after_step(self):
         self._try_fit_power_law()
-        
+    
     def _save_val_results_scene_names(self, scenes_file_path, batch_res):
         with open(scenes_file_path, 'a+', encoding='utf8') as f:
             f.seek(0)
             data = yaml.safe_load(f) or {}
-
+            
             data['sources'] = data.get('sources', {})
             data['targets'] = data.get('targets', {})
             data['scene_names'] = data.get('scene_names', []) + ['_'.join(i.split('_')[:-1]) for i in batch_res.scene_name]
@@ -175,21 +175,27 @@ class VDSTTrainer(DistributedTrainer):
             f.seek(0)
             yaml.safe_dump(data, f)
     
-    def _save_intermediate_results(self, path, batch_index, batch_res, is_train=False):
+    def _save_intermediate_results(self, path, batch_index, batch_res, is_diff=False, is_train=False):
         source_images, source_depths = batch_res.sources.images, batch_res.sources.depths
         target_gen_images, target_gen_depths = batch_res.gen_targets.images, batch_res.gen_targets.depths
         target_gt_images, target_gt_depths = batch_res.targets.images, batch_res.targets.depths
         
+        smin, tmin1, tmin2 = [t.min().detach().cpu().item() for t in [source_depths, target_gen_depths, target_gt_depths]]
+        smax, tmax1, tmax2 = [t.max().detach().cpu().item() for t in [source_depths, target_gen_depths, target_gt_depths]]
+        tmin, tmax = min(tmin1, tmin2), max(tmax1, tmax2)
+        
         source_images, source_depths = [einx.id('b v c h w -> b v h w c', t) for t in (source_images, source_depths)]
         
-        target_images, target_depths = [torch.stack(tp, dim=0) for tp in [[target_gen_images, target_gt_images], [target_gen_depths, target_gt_depths]]]
+        imgs = [[target_gen_images, target_gt_images], [target_gen_depths, target_gt_depths]]
+        imgs = [[torch.where(batch_res.targets.depth_masks, (t[0] - t[1]).abs(), 0)] if is_diff else t for t in imgs]
+        target_images, target_depths = [torch.stack(tp, dim=0) for tp in imgs]
         target_images, target_depths = [einx.id('l b v c h w -> l b v h w c', t) for t in (target_images, target_depths)]
         
         source_images, target_images = [t.detach().cpu() for t in (source_images, target_images)]
-        
+
         cmap = plt.get_cmap('jet')
         source_depths, target_depths = [(einx.id('... h w c -> (... h) (w c)', t), t.shape) for t in (source_depths, target_depths)]
-        source_depths, target_depths = [torch.from_numpy(cmap(((t - t.min()) / (t.max() - t.min())).detach().cpu().numpy())).reshape(*shape[:-1], 4)[..., :3] for t, shape in (source_depths, target_depths)]
+        source_depths, target_depths = [torch.from_numpy(cmap(((t - mi) / (ma - mi)).detach().cpu().numpy())).reshape(*shape[:-1], 4)[..., :3] for (t, shape), (mi, ma) in ((source_depths, (smin, smax)), (target_depths, (tmin, tmax)))]
         # source_depths, target_depths = [einx.id('... h w c -> ... h (w c)', t) for t in (source_depths, target_depths)]
         
         sources = einx.id('b v h1 w c, b v h2 w c -> (b (h1 + h2)) (v w) c', source_images, source_depths)
@@ -197,6 +203,8 @@ class VDSTTrainer(DistributedTrainer):
         
         is_val_str = 'train' if is_train else 'val'
         for img, name in [
+            (targets, f'diff_targets_{batch_index}_{is_val_str}')
+        ] if is_diff else [
             (sources, f'sources_{batch_index}_{is_val_str}'),
             (targets, f'targets_{batch_index}_{is_val_str}')
         ]:
@@ -242,6 +250,7 @@ class VDSTTrainer(DistributedTrainer):
                 
                 train_res = self.model(train_batch)
                 self._save_intermediate_results(out_path, 0, train_res, is_train=True)
+                self._save_intermediate_results(out_path, 0, train_res, is_diff=True, is_train=True)
                 self._save_val_results_scene_names(train_scenes_path, train_res)
         
         eval_metricss = []
@@ -258,6 +267,7 @@ class VDSTTrainer(DistributedTrainer):
             # Always uses only number specified of batches for intermediate results of validation scenes
             if should_save_intermediate_results and i < self.intermediate_results_num_batches:
                 self._save_intermediate_results(out_path, i, batch_res)
+                self._save_intermediate_results(out_path, i, batch_res, is_diff=True)
                 self._save_val_results_scene_names(val_scenes_rendered_path, batch_res)
             self._save_val_results_scene_names(val_scenes_path, batch_res)
             

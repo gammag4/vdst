@@ -85,11 +85,13 @@ class VDST(nn.Module):
         
         return super().load_state_dict(state_dict)
     
-    def normalize_sources(self, images, depths):
+    def normalize_sources(self, images, depths, depth_masks):
         eps = 1e-8
-
+        
         # if self.config.depth_normalization_type != 'standardize':
         images = images * 2.0 - 1.0
+        
+        depth_masks = depth_masks.float() * 2.0 - 1.0
         
         if self.config.depth_normalization_type == 'min_max':
             depths = normalize_depths(depths, self.dmin_log, self.dmax_log)
@@ -102,7 +104,7 @@ class VDST(nn.Module):
                 depths = (depths - dmean) / (dstd + eps)
                 # images = (images - self.imean) / (self.istd + eps)
         
-        return images, depths
+        return images, depths, depth_masks
     
     def denormalize_targets(self, images, depths):
         norm_depths = None
@@ -137,7 +139,7 @@ class VDST(nn.Module):
         targets_hw = (targets.images if targets.images is not None else sources.images).shape[-2:]
         sources_depth_masks, targets_depth_masks = [(t.depth_masks & ((t.depths > self.dmin) & (t.depths < self.dmax))) for t in (sources, targets)]
         sources_depths, targets.depths = [torch.clamp(t, min=self.dmin, max=self.dmax) for t in (sources.depths, targets.depths)]
-        sources_images, sources_depths = self.normalize_sources(sources.images, sources_depths)
+        sources_images, sources_depths, norm_sources_depth_masks = self.normalize_sources(sources.images, sources_depths, sources_depth_masks)
         
         sources = edict(
             K=sources.K,
@@ -145,7 +147,8 @@ class VDST(nn.Module):
             t=sources.t,
             images=sources_images,
             depths=sources_depths,
-            depth_masks=sources_depth_masks
+            depth_masks=sources_depth_masks,
+            norm_depth_masks=norm_sources_depth_masks
         )
         queries = edict(
             K=targets.K,

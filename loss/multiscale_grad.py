@@ -13,7 +13,10 @@ class SobelGradComputer(nn.Module):
         self.kernel_block = nn.Buffer(torch.ones(kernel_shape, dtype=torch.float32))
     
     def forward(self, images, target_mask):
-        m = F.conv2d(target_mask, self.kernel_block, padding=0) > 8.9
+        m = target_mask.float().reshape(-1, *target_mask.shape[2:])
+        m = F.conv2d(m, self.kernel_block, padding=0) > 8.9
+
+        images = [t.reshape(-1, *t.shape[2:]) for t in images]
         x_grads = [F.conv2d(t, self.kernel_x, padding=0)[m] for t in images]
         y_grads = [F.conv2d(t, self.kernel_y, padding=0)[m] for t in images]
         
@@ -31,7 +34,7 @@ class DifferenceGradComputer(nn.Module):
 
 
 class MultiScaleGradLoss(nn.Module):
-    def __init__(self, n_scales=4, grad_computer=DifferenceGradComputer(), dist_fn=torch.abs):
+    def __init__(self, n_scales=4, grad_computer=SobelGradComputer(), dist_fn=torch.abs):
         super().__init__()
         
         self.n_scales = n_scales

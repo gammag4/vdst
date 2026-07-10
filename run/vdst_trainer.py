@@ -187,13 +187,16 @@ class VDSTTrainer(DistributedTrainer):
         source_images, source_depths = [einx.id('b v c h w -> b v h w c', t) for t in (source_images, source_depths)]
         
         imgs = [[target_gen_images, target_gt_images], [target_gen_depths, target_gt_depths]]
-        imgs = [[torch.where(batch_res.targets.depth_masks, (t[0] - t[1]).abs(), 0)] if is_diff else t for t in imgs]
+        imgs = [[(t1 - t2).abs(), t2] if is_diff else [t1, t2] for t1, t2 in imgs]
+        imgs[1] = [torch.where(batch_res.targets.depth_masks, imgs[1][0], 0), imgs[1][1]] if is_diff else imgs[1]
+        
         target_images, target_depths = [torch.stack(tp, dim=0) for tp in imgs]
         target_images, target_depths = [einx.id('l b v c h w -> l b v h w c', t) for t in (target_images, target_depths)]
         
         source_images, target_images = [t.detach().cpu() for t in (source_images, target_images)]
-
-        cmap = plt.get_cmap('jet')
+        
+        #TODO turbo or magma
+        cmap = plt.get_cmap('turbo')
         source_depths, target_depths = [(einx.id('... h w c -> (... h) (w c)', t), t.shape) for t in (source_depths, target_depths)]
         source_depths, target_depths = [torch.from_numpy(cmap(((t - mi) / (ma - mi)).detach().cpu().numpy())).reshape(*shape[:-1], 4)[..., :3] for (t, shape), (mi, ma) in ((source_depths, (smin, smax)), (target_depths, (tmin, tmax)))]
         # source_depths, target_depths = [einx.id('... h w c -> ... h (w c)', t) for t in (source_depths, target_depths)]
@@ -297,11 +300,12 @@ class VDSTTrainer(DistributedTrainer):
     
     def _post_train(self):
         self.training = False
-        shutil.rmtree(os.path.join(self.config.train.checkpoints.path, 'final_eval'), ignore_errors=True)
+        out_path = os.path.join(self.config.train.checkpoints.path, f'final_eval_{self.current_step}')
+        shutil.rmtree(out_path, ignore_errors=True)
         # self._eval(self.train_dataloader, os.path.join(self.config.train.checkpoints.path, 'final_eval', 'train'), False)
-        self._eval(self.val_dataloader, os.path.join(self.config.train.checkpoints.path, 'final_eval', 'val'), False)
-        self._eval(self.test_dataloader, os.path.join(self.config.train.checkpoints.path, 'final_eval', 'test'), False)
-        self._eval(self.test_new_category_dataloader, os.path.join(self.config.train.checkpoints.path, 'final_eval', 'test_new_category'), False)
+        self._eval(self.val_dataloader, os.path.join(out_path, 'val'), False)
+        self._eval(self.test_dataloader, os.path.join(out_path, 'test'), False)
+        self._eval(self.test_new_category_dataloader, os.path.join(out_path, 'test_new_category'), False)
         self.training = True # TODO remove
     
     def _run_forward(self, batch):

@@ -146,9 +146,9 @@ class PoseEncoder(nn.Module):
         # images, depths, depth_masks: (...B, C, H, W), K: (3, 3), R: (...B, 3, 3), t: (...B, 3), hw: (2,)
         if self.is_query_encoder:
             K, R, t, hw = batch.K, batch.R, batch.t, batch.hw
-            depth_masks = None
+            norm_depth_masks = None
         else:
-            K, R, t, images, depths, depth_masks = batch.K, batch.R, batch.t, batch.images, batch.depths, batch.depth_masks
+            K, R, t, images, depths, norm_depth_masks = batch.K, batch.R, batch.t, batch.images, batch.depths, batch.norm_depth_masks
 
             hw = images.shape[-2:]
 
@@ -158,7 +158,7 @@ class PoseEncoder(nn.Module):
             images = F.pad(images, pad, 'constant', 0)
             if self.config.depth_input_type is not None:
                 depths = F.pad(depths, pad, 'constant', 0)
-                depth_masks = F.pad(depth_masks, pad, 'constant', False)
+                norm_depth_masks = F.pad(norm_depth_masks, pad, 'constant', 0.0)
         
         o, d = compute_view_rays(K, R, t, pad, hw)
         
@@ -179,7 +179,7 @@ class PoseEncoder(nn.Module):
                 exp_inputs.append(depths)
                 
                 if self.config.has_input_depth_masks:
-                    exp_inputs.append(depth_masks.float())
+                    exp_inputs.append(norm_depth_masks)
         
         left_exp = ', '.join([f'... c{i} (h p1) (w p2)' for i in range(len(exp_inputs))])
         right_exp = ' + '.join([f'c{i}' for i in range(len(exp_inputs))])

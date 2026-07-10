@@ -1,0 +1,75 @@
+scene_names:
+- scissor_scene_790
+- box_scene_334
+- bottle_scene_526
+- potato_scene_071
+sources:
+  depths_ids:
+  - - 00104.png
+    - 00058.png
+  - - 00105.png
+    - 00156.png
+  - - 00078.png
+    - 00022.png
+  - - 00113.png
+    - 00175.png
+  images_ids:
+  - - 00104.png
+    - 00058.png
+  - - 00105.png
+    - 00156.png
+  - - 00078.png
+    - 00022.png
+  - - 00113.png
+    - 00175.png
+targets:
+  depths_ids:
+  - - 00083.png
+    - 00068.png
+    - 00098.png
+    - 00066.png
+    - 00094.png
+    - 00073.png
+  - - 00152.png
+    - 00128.png
+    - 00140.png
+    - 00114.png
+    - 00129.png
+    - 00150.png
+  - - 00055.png
+    - 00027.png
+    - 00034.png
+    - 00025.png
+    - 00067.png
+    - 00043.png
+  - - 00146.png
+    - 00126.png
+    - 00130.png
+    - 00162.png
+    - 00166.png
+    - 00145.png
+  images_ids:
+  - - 00083.png
+    - 00068.png
+    - 00098.png
+    - 00066.png
+    - 00094.png
+    - 00073.png
+  - - 00152.png
+    - 00128.png
+    - 00140.png
+    - 00114.png
+    - 00129.png
+    - 00150.png
+  - - 00055.png
+    - 00027.png
+    - 00034.png
+    - 00025.png
+    - 00067.png
+    - 00043.png
+  - - 00146.png
+    - 00126.png
+    - 00130.png
+    - 00162.png
+    - 00166.png
+    - 00145.png

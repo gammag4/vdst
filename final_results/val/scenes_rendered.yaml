@@ -1,0 +1,75 @@
+scene_names:
+- bowl_scene_215
+- box_scene_112
+- flower_pot_scene_224
+- bowl_scene_488
+sources:
+  depths_ids:
+  - - 00328.png
+    - 00270.png
+  - - 00017.png
+    - 00079.png
+  - - 00047.png
+    - 00007.png
+  - - 00222.png
+    - 00282.png
+  images_ids:
+  - - 00328.png
+    - 00270.png
+  - - 00017.png
+    - 00079.png
+  - - 00047.png
+    - 00007.png
+  - - 00222.png
+    - 00282.png
+targets:
+  depths_ids:
+  - - 00285.png
+    - 00273.png
+    - 00320.png
+    - 00272.png
+    - 00304.png
+    - 00282.png
+  - - 00064.png
+    - 00030.png
+    - 00055.png
+    - 00019.png
+    - 00045.png
+    - 00061.png
+  - - 00039.png
+    - 00016.png
+    - 00021.png
+    - 00010.png
+    - 00042.png
+    - 00030.png
+  - - 00263.png
+    - 00233.png
+    - 00250.png
+    - 00271.png
+    - 00276.png
+    - 00257.png
+  images_ids:
+  - - 00285.png
+    - 00273.png
+    - 00320.png
+    - 00272.png
+    - 00304.png
+    - 00282.png
+  - - 00064.png
+    - 00030.png
+    - 00055.png
+    - 00019.png
+    - 00045.png
+    - 00061.png
+  - - 00039.png
+    - 00016.png
+    - 00021.png
+    - 00010.png
+    - 00042.png
+    - 00030.png
+  - - 00263.png
+    - 00233.png
+    - 00250.png
+    - 00271.png
+    - 00276.png
+    - 00257.png

@@ -1,0 +1,75 @@
+scene_names:
+- truck_scene_114
+- truck_scene_241
+- truck_scene_175
+- truck_scene_255
+sources:
+  depths_ids:
+  - - 00294.png
+    - 00228.png
+  - - 00192.png
+    - 00239.png
+  - - 00096.png
+    - 00050.png
+  - - 00235.png
+    - 00296.png
+  images_ids:
+  - - 00294.png
+    - 00228.png
+  - - 00192.png
+    - 00239.png
+  - - 00096.png
+    - 00050.png
+  - - 00235.png
+    - 00296.png
+targets:
+  depths_ids:
+  - - 00259.png
+    - 00254.png
+    - 00287.png
+    - 00234.png
+    - 00275.png
+    - 00255.png
+  - - 00237.png
+    - 00209.png
+    - 00228.png
+    - 00202.png
+    - 00217.png
+    - 00233.png
+  - - 00078.png
+    - 00053.png
+    - 00059.png
+    - 00051.png
+    - 00079.png
+    - 00065.png
+  - - 00274.png
+    - 00237.png
+    - 00253.png
+    - 00283.png
+    - 00284.png
+    - 00271.png
+  images_ids:
+  - - 00259.png
+    - 00254.png
+    - 00287.png
+    - 00234.png
+    - 00275.png
+    - 00255.png
+  - - 00237.png
+    - 00209.png
+    - 00228.png
+    - 00202.png
+    - 00217.png
+    - 00233.png
+  - - 00078.png
+    - 00053.png
+    - 00059.png
+    - 00051.png
+    - 00079.png
+    - 00065.png
+  - - 00274.png
+    - 00237.png
+    - 00253.png
+    - 00283.png
+    - 00284.png
+    - 00271.png

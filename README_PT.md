@@ -2,25 +2,15 @@
 
 | [English](README.md) | Português |
 
-![Resultados (imagens)](results.png)
-![Resultados (distâncias)](results_depths.png)
-
-> [!NOTE]
-> Esse modelo está atualmente em desenvolvimento/experimentação e não está completo ainda.
-> Os resultados acima são de uma primeira run experimental (depois de treinar por dois dias em uma RTX 4060 Ti com 8GB vRAM).
-> Mais detalhes sobre esses e outros experimentos podem ser encontrados [aqui](https://wandb.ai/gammag9-none/vdst/runs/ob9jxu15).
-
 Essa é a implementação do modelo VDST, junto com o código para treiná-lo com os datasets usados originalmente.
 
 Este é um modelo de RGB-D Novel View Synthesis, onde dadas um conjunto de visões de uma cena 3D com respectivos mapas de distâncias e propriedades/poses de câmera destas,
 o modelo busca gerar uma nova visão com respectivo mapa de distância na cena, dadas as propriedades e pose da visão que se deseja gerar.
 
-Nós propomos VDST para investigar a capacidade de modelos baseados em Transformer de resolver o problema de RGB-D Novel View Synthesis.
-Esse tipo de arquitetura baseada em Transformer para Novel View Synthesis não é nova e não foi originalmente proposta por nós.
-No nosso caso, a arquitetura e filosofia do modelo foi inspirada principalmente no [LVSM](https://haian-jin.github.io/projects/LVSM/),
-embora existam outras arquiteturas similares também, sendo [SRT](https://srt-paper.github.io/) outro exemplo relevante.
+Esse modelo foi inspirado primariamente pela arquitetura e filosofia de [LVSM](https://haian-jin.github.io/projects/LVSM/),
+onde ele aplica a mesma ideia central para a tarefa de Novel View Synthesis RGB-D.
 
-Essas são as vantagens principais que esse modelo tem em comparação com outros métodos:
+Essas são as vantagens principais que esse modelo tem em comparação com outros métodos de NVS RGB-D:
 
 - Devido à capacidade de generalização entre domínios de modelos baseados em Transformer, ele é capaz de:
   - Generalizar para cenas novas que seguem uma distribuição similar à dos dados originais de treino;
@@ -29,6 +19,62 @@ Essas são as vantagens principais que esse modelo tem em comparação com outro
   e hipotetizamos que isso permite alcançar melhor resultados do que outros métodos quando treinado por períodos mais longos com quantidades suficientemente grandes de dados,
   apesar de não termos recursos computacionais suficientes para verificar isso, deixando tal investigação como trabalho futuro;
 - Ele pode ser treinado com recursos limitados sem divergir (o autor usou uma única RTX 4060 Ti com 8 GB de VRAM).
+
+Os pesos do modelo treinado podem ser encontrados [aqui](https://huggingface.co/gammag7/vdst).
+
+### Resultados
+
+Aqui estão alguns dos resultados do modelo depois de treinado com batch size 4 por 350000 iterações usando uma RTX 4060 Ti com 8GB de VRAM, durando 6 dias.
+
+Métricas:
+
+- Imagem:
+  - PSNR: 19.72
+  - SSIM: 0.588
+  - LPIPS: 0.424
+- Profundidade:
+  - AbsRel: 0.0401
+  - RMSE: 0.168
+  - $\delta_{1}$: 0.971
+
+Conjunto de validação:
+
+![Resultados no conjunto de validação](final_results/val/targets_0_val.png)
+
+Conjunto de teste:
+
+![Resultados no conjunto de teste](final_results/test/targets_0_val.png)
+
+Conjunto de teste nova categoria (categoria `truck`):
+
+![Resultados no conjunto de teste nova categoria](final_results/test_new_category/targets_0_val.png)
+
+### Arquitetura
+
+<img src="Architecture.png" width="800px" alt="Arquitetura">
+
+## Renderizando
+
+Nós também fizemos um renderizador que você pode usar para navegar nas cenas usando esse modelo, você pode encontrá-lo [aqui](https://github.com/gammag4/nvs_renderer).
+
+## Dataset
+
+Um script para baixar e processar o WildRGB-D dataset pode ser encontrado [aqui](https://github.com/gammag4/nvs_datasets).
+
+O dataset foi dividido em quatro conjuntos:
+
+- `train`: Usado para treinar o modelo;
+- `val`: Usado para avaliar as métricas durante e no final do treino dos experimentos e escolher o melhor experimento;
+- `test`: Usado para avaliar as métricas do modelo treinado final em cenas novas que não estavam nos conjuntos de treino ou validação;
+- `test_new_category`: Usado para avaliar as métricas do modelo treinado final em cenas de uma categoria não usada durante o treino.
+
+Os resultados dos três conjuntos de validação/teste escolhidos estão na pasta `final_results`, cujos resultados estão separados nos seguintes arquivos:
+
+- `scenes.yaml`: Cenas usadas na avaliação quantitativa daquele conjunto;
+- `scenes_rendered.yaml`: Cenas escolhidas daquele conjunto para serem renderizadas e usadas na avaliação qualitativa;
+- `sources_n_val.png`: Imagens-fonte do batch n usado para avaliação qualitativa, cujas imagens são especificadas por `scenes_rendered.yaml`;
+- `targets_0_val.png`: Renderizações das imagens-alvo do batch n usado para avaliação qualitativa, cujas imagens são especificadas por `scenes_rendered.yaml`;
+- `eval_metrics.yaml`: Métricas finais da avaliação quantitativa (`snr_log` e `sqrt_snr_log` são apenas para debug, não são métricas reais).
 
 ## Treinamento
 
@@ -41,7 +87,7 @@ Você precisa de:
 
 ### Baixando e processando datasets
 
-Baixe e processe o dataset WildRGB-D usando o script disponibilizado [aqui](https://github.com/gammag4/nvs_datasets) para a pasta `datasets/wildrgbd`.
+Baixe e processe o dataset WildRGB-D usando o script disponibilizado para a pasta `datasets/wildrgbd`.
 
 ### Criando ambiente
 
@@ -60,7 +106,3 @@ Rode o script de treino:
 ```bash
 torchrun --standalone --nproc-per-node=gpu train.py --config config.yaml
 ```
-
-## Renderizando
-
-Nós também fizemos um renderizador que você pode usar para navegar nas cenas usando esse modelo, você pode encontrá-lo [aqui](https://github.com/gammag4/nvs_renderer).

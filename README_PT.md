@@ -10,14 +10,14 @@ o modelo busca gerar uma nova visão com respectivo mapa de distância na cena, 
 Esse modelo foi inspirado primariamente pela arquitetura e filosofia de [LVSM](https://haian-jin.github.io/projects/LVSM/),
 onde ele aplica a mesma ideia central para a tarefa de Novel View Synthesis RGB-D.
 
-Essas são as vantagens principais que esse modelo tem em comparação com outros métodos de NVS RGB-D:
+Vantagens principais que esse modelo tem em comparação com outros métodos de NVS RGB-D:
 
 - Devido à capacidade de generalização entre domínios de modelos baseados em Transformer, ele é capaz de:
   - Generalizar para cenas novas que seguem uma distribuição similar à dos dados originais de treino;
   - Realizar few-shot NVS, precisando de apenas duas imagens-fonte ou às vezes apenas uma na maioria dos casos para gerar novas visões;
-- Seguindo a mesma filosofia do LVSM, nossa arquitetura também tenta minimizar o viés indutivo do modelo,
+- Seguindo a mesma abordagem de LVSM, nossa arquitetura também tenta minimizar o viés indutivo do modelo,
   e hipotetizamos que isso permite alcançar melhor resultados do que outros métodos quando treinado por períodos mais longos com quantidades suficientemente grandes de dados,
-  apesar de não termos recursos computacionais suficientes para verificar isso, deixando tal investigação como trabalho futuro;
+  apesar de não termos recursos computacionais suficientes para verificar isso, deixando tal investigação para trabalhos futuros;
 - Ele pode ser treinado com recursos limitados sem divergir (o autor usou uma única RTX 4060 Ti com 8 GB de VRAM).
 
 Os pesos do modelo treinado podem ser encontrados [aqui](https://huggingface.co/gammag7/vdst).

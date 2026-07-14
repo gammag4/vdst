@@ -10,12 +10,12 @@ the model aims to generate a new view/depth in the scene, given the camera prope
 This model was inspired primarily by the architecture and phylosophy of [LVSM](https://haian-jin.github.io/projects/LVSM/),
 where it applies its same core idea to the task of RGB-D Novel View Synthesis.
 
-These are the main advantages this model has in comparison to other methods for RGB-D NVS:
+Main advantages this model has in comparison to other methods for RGB-D NVS:
 
 - Due to the generalization ability of Transformer-based models across domains, it is capable of:
   - Generalizing to novel scenes that follow a similar distribution to the original training data;
   - Doing few-shot NVS, needing only two source images or even just a single one in most cases for generating new views;
-- Following the same philosophy as LVSM, our architecture also tries to minimize the inductive bias of the model,
+- Following the same approach as LVSM, our architecture also tries to minimize the inductive bias of the model,
   and we hypothesize that this allows it to achieve better results than other methods when trained for longer periods with sufficiently large amounts of data,
   although we do not have enough computational resources to verify this, leaving it for future work;
 - It can be trained under constrained resources without diverging (the author used a single RTX 4060 Ti with 8GB VRAM).

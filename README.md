@@ -10,6 +10,13 @@ the model aims to generate a new view/depth in the scene, given the camera prope
 This model was inspired primarily by the architecture and phylosophy of [LVSM](https://haian-jin.github.io/projects/LVSM/),
 where it applies its same core idea to the task of RGB-D Novel View Synthesis.
 
+Main contributions:
+
+- The architecture (VDST);
+- A variation of perceptual loss using ConvNeXt instead of VGG-19;
+- A perceptual loss for depth maps based in ConvNeXt with a second CNN specific for estimating the receptive field and allow using masks of invalid values in the loss latents;
+- A processing pipeline for datasets of RGB-D scenes that allows isolating the evaluation of content generation and view interpolation in the new generated views.
+
 Main advantages this model has in comparison to other methods for RGB-D NVS:
 
 - Due to the generalization ability of Transformer-based models across domains, it is capable of:

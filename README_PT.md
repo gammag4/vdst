@@ -10,6 +10,13 @@ o modelo busca gerar uma nova visão com respectivo mapa de distância na cena, 
 Esse modelo foi inspirado primariamente pela arquitetura e filosofia de [LVSM](https://haian-jin.github.io/projects/LVSM/),
 onde ele aplica a mesma ideia central para a tarefa de Novel View Synthesis RGB-D.
 
+Principais contribuições:
+
+- A arquitetura (VDST);
+- Uma variação da perda perceptual usando ConvNeXt no lugar de VGG-19;
+- Uma perda perceptual para profundidade baseada em ConvNeXt com uma segunda CNN específica para estimar o campo receptivo e permitir usar máscaras de valores inválidos nos latentes da perda;
+- Um pipeline de processamento de datasets de cenas RGB-D que permite isolar a avaliação de geração de conteúdo e interpolação de visões nas novas visões geradas.
+
 Vantagens principais que esse modelo tem em comparação com outros métodos de NVS RGB-D:
 
 - Devido à capacidade de generalização entre domínios de modelos baseados em Transformer, ele é capaz de:

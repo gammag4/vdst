@@ -64,6 +64,10 @@ Test new category set (`truck` category):
 
 We also made a renderer that you can use to navigate on the scenes using this model, you can check it out [here](https://github.com/gammag4/nvs_renderer).
 
+Rendering a scene:
+
+https://github.com/user-attachments/assets/35a33c5e-fd6a-473b-b55a-ea6f4a667a93
+
 ## Dataset
 
 A script for downloading and processing the WildRGB-D dataset can be found [here](https://github.com/gammag4/nvs_datasets).

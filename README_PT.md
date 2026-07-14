@@ -64,6 +64,10 @@ Conjunto de teste nova categoria (categoria `truck`):
 
 Nós também fizemos um renderizador que você pode usar para navegar nas cenas usando esse modelo, você pode encontrá-lo [aqui](https://github.com/gammag4/nvs_renderer).
 
+Renderizando uma cena:
+
+https://github.com/user-attachments/assets/35a33c5e-fd6a-473b-b55a-ea6f4a667a93
+
 ## Dataset
 
 Um script para baixar e processar o WildRGB-D dataset pode ser encontrado [aqui](https://github.com/gammag4/nvs_datasets).

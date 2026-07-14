@@ -137,8 +137,13 @@ class VDST(nn.Module):
     def forward(self, scene):
         sources, targets = scene.sources, scene.targets
         targets_hw = (targets.images if targets.images is not None else sources.images).shape[-2:]
-        sources_depth_masks, targets_depth_masks = [(t.depth_masks & ((t.depths > self.dmin) & (t.depths < self.dmax))) for t in (sources, targets)]
-        sources_depths, targets.depths = [torch.clamp(t, min=self.dmin, max=self.dmax) for t in (sources.depths, targets.depths)]
+        
+        sources_depth_masks = (sources.depth_masks & ((sources.depths > self.dmin) & (sources.depths < self.dmax)))
+        targets_depth_masks = (targets.depth_masks & ((targets.depths > self.dmin) & (targets.depths < self.dmax))) if targets.images is not None else None
+        
+        sources_depths = torch.clamp(sources.depths, min=self.dmin, max=self.dmax)
+        targets.depths = torch.clamp(targets.depths, min=self.dmin, max=self.dmax) if targets.images is not None else None
+        
         sources_images, sources_depths, norm_sources_depth_masks = self.normalize_sources(sources.images, sources_depths, sources_depth_masks)
         
         sources = edict(

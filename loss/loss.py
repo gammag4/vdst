@@ -2,12 +2,13 @@ import torch
 import torch.nn as nn
 import einx
 import torch.nn.functional as F
+import torchvision.transforms.v2 as T
 from easydict import EasyDict as edict
 import math
 
 from .multiscale_grad import MultiScaleGradLoss
 from .perceptual import PerceptualLoss
-from utils.data import normalize_depths
+from utils.data import create_input_normalizer
 
 
 class Loss(nn.Module):
@@ -30,6 +31,9 @@ class Loss(nn.Module):
         self.perceptual_depth = PerceptualLoss(config=self.config.perceptual.depth, dist_fn_raw=torch.square, dist_fn=torch.abs)
         self.depth_perceptual_type = self.config.perceptual.depth.input_type
         
+        self.normalize_image = create_input_normalizer(self.config.perceptual.image.input_type, self.config.perceptual.image.is_diff)
+        self.normalize_depth = create_input_normalizer(self.config.perceptual.depth.input_type, self.config.perceptual.depth.is_diff)
+        
         self.eval()
         for param in self.parameters():
             param.requires_grad = False
@@ -39,28 +43,21 @@ class Loss(nn.Module):
         images_gt, depths_gt = targets.images, targets.depths
         depths_gt_masks = targets.depth_masks
         
+        normalize_before_all_losses = True #TODO move to loss config
+        
+        if normalize_before_all_losses:
+            images, images_gt = [self.normalize_image(t) for t in (images, images_gt)]
+        
         image_mse_loss = F.mse_loss(images, images_gt)
         
-        image_perceptual_loss, weighted_image_perceptual_losses, _ = self.perceptual_image(images, images_gt, use_raw_distance=False)
+        image_perceptual_loss, weighted_image_perceptual_losses, _ = self.perceptual_image(images, images_gt, use_raw_distance=False, should_normalize=not normalize_before_all_losses)
         
         depths_log, depths_gt_log = depths.log(), depths_gt.log()
+        depths_log, depths_gt_log = [self.normalize_depth(t) for t in (depths_log, depths_gt_log)]
         
-        if self.depth_perceptual_type == 'log_depth':
-            # We hypothesize this already imitates grad loss but the problem is that here we cant use the mask
-            depths_norm, depths_gt_norm = depths_log, depths_gt_log
-        elif self.depth_perceptual_type == 'norm_log_depth':
-            if self.model_config.depth_normalization_type == 'min_max':
-                depths_norm = gen_targets.norm_depths
-                depths_gt_norm = normalize_depths(depths_gt, self.dmin_log, self.dmax_log)
-            else:
-                depths_norm, depths_gt_norm = [normalize_depths(t, self.dmin_log, self.dmax_log) for t in (depths, depths_gt)]
-        else:
-            assert False, f'Invalid perceptual type "{self.depth_perceptual_type}"'
-        
-        depths_log, depths_gt_log, depths_norm, depths_gt_norm = [torch.where(depths_gt_masks, t, 0.0) for t in (depths_log, depths_gt_log, depths_norm, depths_gt_norm)]
-        depths_mask = depths_log.isinf() | depths_log.isnan() | depths_norm.isinf() | depths_norm.isnan()
+        depths_log, depths_gt_log = [torch.where(depths_gt_masks, t, 0.0) for t in (depths_log, depths_gt_log)]
+        depths_mask = depths_log.isinf() | depths_log.isnan()
         depths_log = torch.where(depths_mask, depths_gt_log, depths_log)
-        depths_norm = torch.where(depths_mask, depths_gt_norm, depths_norm)
         
         log_diff = depths_log - depths_gt_log
         log_diff_masked = log_diff[depths_gt_masks]
@@ -74,13 +71,13 @@ class Loss(nn.Module):
         
         # TODO maybe use network trained specifically for depth
         # normalization not needed bc the perceptual transforms already normalizes the images
-        _, weighted_depth_perceptual_losses, depth_perceptual_per_image_losses = self.perceptual_depth(depths_norm, depths_gt_norm, depths_gt_masks, use_raw_distance=False)
+        _, weighted_depth_perceptual_losses, depth_perceptual_per_image_losses = self.perceptual_depth(depths_log, depths_gt_log, depths_gt_masks, use_raw_distance=False, should_normalize=not normalize_before_all_losses)
         
         # TODO one problem is that its hard to normalize the losses only for valid pixels bc you cant know in the middle layers which pixels are valid
         # This is the best way i found to normalize them only for valid pixels TODO check if its better than not normalizing
         # Since it divides by numel, we multiply by numel and divide by number of valid pixels
         # Then we assume this ratio in distances will statistically propagate to the features in the middle
-        total_to_valid_pixels_ratio = depths_norm[-3:].numel() / einx.sum('... h w -> ...', depths_gt_masks)
+        total_to_valid_pixels_ratio = depths_log[-3:].numel() / einx.sum('... h w -> ...', depths_gt_masks)
         depth_perceptual_loss = (depth_perceptual_per_image_losses * total_to_valid_pixels_ratio).mean()
         
         # TODO add SSI error

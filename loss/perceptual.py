@@ -3,9 +3,11 @@ import torch
 import torch.nn as nn
 import einx
 import torchvision.transforms.v2 as T
-from torchvision.models import convnext_tiny, ConvNeXt_Tiny_Weights, vgg19, VGG19_Weights
 import torchvision.transforms.functional as VF
+from torchvision.models import convnext_tiny, ConvNeXt_Tiny_Weights, vgg19, VGG19_Weights
 from easydict import EasyDict as edict
+
+from utils.data import create_input_normalizer
 
 
 def normalize_conv2d_layer(layer):
@@ -32,30 +34,6 @@ class PerceptualLoss(nn.Module):
         
         assert interpolation in ['default', 'nearest'], f'Invalid interpolation "{interpolation}"'
         assert model_type in ['convnext', 'vgg', 'vgg2', 'vgg3'], f'Invalid model type "{model_type}"'
-
-        # TODO these values were computed for d_min = 0.01 and d_max = 1000.0
-        # if the range changes, these need to be recomputed for the new range
-        # fix this so that it can be normalized for range shifts (they were computed from the formula in loss.py)
-        # The stats from CO3D were estimated from the processed dataset, so they are different from the ones from the full raw dataset
-        if self.input_type == 'image':
-            # Defaults for imagenet1k
-            raw_transforms = ConvNeXt_Tiny_Weights.DEFAULT.transforms()
-            data_mean, data_std = raw_transforms.mean, raw_transforms.std
-        elif self.input_type == 'log_depth':
-            # From CO3D
-            data_mean, data_std = [-0.2749] * 3, [0.9187] * 3
-        elif self.input_type == 'norm_log_depth':
-            # From CO3D
-            data_mean, data_std = [0.3761] * 3, [0.0798] * 3
-        # elif self.input_type == 'norm_log_depth2': # normalize_depths2 in data.py from that paper
-        #     data_mean, data_std = 0.002, 0.0018
-        else:
-            assert False, f'Invalid input type "{self.input_type}"'
-        
-        if self.is_diff:
-            data_mean, data_std = [0.0] * 3, [i * (2 ** 0.5) for i in data_std]
-        
-        norm_dict = dict(mean=data_mean, std=data_std)
         
         arch = self.cnn_archs.get(model_type, None)
         mask_arch = self.cnn_archs.get(model_type + '_mask', None) if self.input_type != 'image' else None
@@ -133,38 +111,24 @@ class PerceptualLoss(nn.Module):
             layer_weights = torch.ones(len(indices), dtype=torch.float32) if layer_weights is None else layer_weights
         
         if self.transforms_type in ['default', 'default_size_224', 'default_size_236']:
-            self.base_transforms = weights.transforms(**norm_dict)
+            self.transforms = weights.transforms(mean=[0.0] * 3, std=[1.0] * 3)
             
             # resizing and cropping at same size to not lose information
             if self.transforms_type == 'default_size_224':
-                self.base_transforms.resize_size = 224
+                self.transforms.resize_size = 224
             if self.transforms_type == 'default_size_236':
-                self.base_transforms.crop_size = 236
+                self.transforms.crop_size = 236
             
             if interpolation == 'nearest':
-                self.base_transforms.interpolation = T.InterpolationMode.NEAREST
+                self.transforms.interpolation = T.InterpolationMode.NEAREST
             
         elif self.transforms_type == 'normalize':
-            self.base_transforms = T.Normalize(**norm_dict)
-            
-        elif self.transforms_type == 'standardize':
-            # Using transforms in pairs allows it to standardize in comparison to ground truth, making it dependent on scale discrepancies
-            def base_t(x, y):
-                eps = 1e-5
-                (m1, s1), (m2, s2) = [(einx.mean('... v c h w -> ... 1 1 1 1', t), einx.std('... v c h w -> ... 1 1 1 1', t)) for t in (x, y)]
-                m = (m1 + m2) * 0.5
-                s = ((s1 ** 2 + s2 ** 2) * 0.5 + ((m1 - m2) * 0.5) ** 2).sqrt() + eps
-                
-                return tuple((t - m) / s for t in (x, y))
-            
-            self.base_transforms = lambda x: x
-            self.transforms = base_t
+            self.transforms = None
             
         else:
             assert False, f'Invalid transforms type "{self.transforms_type}"'
         
-        if self.transforms_type != 'standardize':
-            self.transforms = lambda x, y: (self.base_transforms(x), self.base_transforms(y))
+        self.normalize_transform = create_input_normalizer(self.input_type, self.is_diff)
         
         self.layer_weights = nn.Buffer(layer_weights)
         
@@ -200,7 +164,7 @@ class PerceptualLoss(nn.Module):
         
         return self.distance(x1, x2, m, dist_fn=dist_fn)
     
-    def forward(self, input, target, mask=None, use_raw_distance=True):
+    def forward(self, input, target, mask=None, use_raw_distance=True, should_normalize=True):
         losses = []
         
         mask = mask.float() if mask is not None else None
@@ -225,8 +189,9 @@ class PerceptualLoss(nn.Module):
         if 'default' in self.transforms_type:
             # Pads with zeros to make it square
             x1, x2, m = [VF.center_crop(t, max(t.shape[-1], t.shape[-2])) if t is not None else None for t in (x1, x2, m)]
-        x1, x2 = self.transforms(x1, x2)
-        m = None if mask is None else self.base_transforms(m)
+        
+        x1, x2, m = [(self.normalize_transform(t) if should_normalize else t) if t is not None else None for t in (x1, x2, m)]
+        x1, x2, m = [(self.transforms(t) if self.transforms is not None else t) if t is not None else None for t in (x1, x2, m)]
         
         for i, l in enumerate(self.layers):
             x1, x2 = l(x1), l(x2)

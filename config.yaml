@@ -122,14 +122,14 @@ train:
     # weights: [3.0, 0.5, 1.0, 1.0, 0.4]
     # weights: [2.0, 1.0, 1.0, 1.0, 1.0]
     # weights: [0.5, 1.0, 0.5, 1.0, 0.5]
-    weights: [3.0, 6.3, 0.07, 0.1, 0.16]
+    weights: [0.16, 6.3, 0.12, 0.13, 0.1]
     should_normalize_weights: true
     # Perceptual loss config
     perceptual:
       # Either 'constant' or 'falling_perceptual'
       scheduler: falling_perceptual
       image:
-        # Either 'default', 'default_size_224', 'default_size_236', 'normalize' or 'standardize'
+        # Either 'default', 'default_size_224', 'default_size_236' or 'normalize'
         transforms: default_size_224
         # Weights for each layer, either array or null for all ones
         weights: null
@@ -145,7 +145,7 @@ train:
         # weights: [2.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
         # Either 'nearest' or 'default' (bilinear)
         interpolation: default
-        # Either 'image', 'log_depth' or 'norm_log_depth'
+        # Either 'image' or 'log_depth'
         input_type: image
         # If true, compares the difference between the images with the average image (just an image with all values at exactly the mean)
         is_diff: false

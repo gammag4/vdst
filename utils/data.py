@@ -2,7 +2,30 @@ from easydict import EasyDict as edict
 import cv2
 import torch
 import einx
+import torchvision.transforms.v2 as T
 import torchvision.transforms.functional as VF
+from torchvision.models import ConvNeXt_Tiny_Weights
+
+
+# TODO these stats were computed for d_min = 0.01 and d_max = 1000.0
+# if the range changes, these need to be recomputed for the new range
+# fix this so that it can be normalized for range shifts (they were computed from the formula in loss.py)
+# The stats from CO3D were estimated from the processed dataset, so they are different from the ones from the full raw dataset
+def create_input_normalizer(input_type, is_diff):
+    if input_type == 'image':
+        # imagenet_1k
+        convnext_transforms = ConvNeXt_Tiny_Weights.DEFAULT.transforms()
+        m, s = convnext_transforms.mean, convnext_transforms.std
+    elif input_type == 'log_depth':
+        # co3d log_depth
+        m, s = [-0.2749], [0.9187]
+    else:
+        assert False, f'Invalid input type "{input_type}"'
+    
+    if is_diff:
+        m, s = [0.0] * len(m), [i * (2 ** 0.5) for i in s]
+    
+    return T.Normalize(mean=m, std=s)
 
 
 def normalize_depths(depths, log_min, log_max):

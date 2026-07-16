@@ -267,6 +267,27 @@ class DistributedTrainer(ABC):
         self.grad_scaler.update()
         
         self.logger.log({'metrics/loss': loss.detach().item()})
+        
+        pmin = torch.tensor(torch.inf, dtype=torch.double, device=self.model.device)
+        pmax = torch.tensor(-torch.inf, dtype=torch.double, device=self.model.device)
+        pmeansum = torch.tensor(0.0, dtype=torch.double, device=self.model.device)
+        pstdsum = torch.tensor(0.0, dtype=torch.double, device=self.model.device)
+        numel = 0
+        
+        for p in self.model.parameters():
+            pmin = torch.min(pmin, p.min().detach().double())
+            pmax = torch.max(pmax, p.max().detach().double())
+            pmeansum += p.sum().detach().double()
+            numel += p.numel()
+        pmean = (pmeansum / numel).item()
+        
+        for p in self.model.parameters():
+            pstdsum += (p - pmean).square().sum()
+        pstd = (pstdsum / numel).sqrt().item()
+        
+        pmin, pmax = pmin.item(), pmax.item()
+        
+        self.logger.log({'metrics/params': {'mean': pmean, 'std': pstd, 'min': pmin, 'max': pmax}})
     
     # This method is run after each pass to update stuff
     def _step(self):

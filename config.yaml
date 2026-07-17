@@ -210,11 +210,12 @@ model:
   d_range: [0.01, 1000.0] # 1cm to 1km
   # Type of normalization for images and depths
   # Can be either 'standardize' (standardizes depths to to mean 0 std 1) 'min_max' (normalizes depth to min-max range) or null
-  depth_normalization_type: standardize
+  input_normalization_type: standardize
   # Output used for image, can be either 'linear' or 'sigmoid'
+  # If input_normalization_type is not 'min_max', this is ignored
   image_output_type: linear
   # Output used for normalized depth before denormalizing it, can be either 'linear' or 'sigmoid'
-  # If depth_normalization_type is not 'min_max', this is ignored
+  # If input_normalization_type is not 'min_max', this is ignored
   norm_depth_output_type: linear
   # Enable/disable activation checkpointing
   use_activation_checkpointing: true

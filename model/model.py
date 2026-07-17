@@ -7,7 +7,7 @@ import math
 
 from .pose_encoder import PoseEncoder
 from .transformer import Encoder
-from utils.data import normalize_depths, denormalize_depths, normalize_depths2, denormalize_depths2
+from utils.data import get_input_norm_stats, normalize_depths, denormalize_depths, normalize_depths2, denormalize_depths2
 
 
 class VDST(nn.Module):
@@ -19,16 +19,21 @@ class VDST(nn.Module):
         
         self.config = config
         
-        assert self.config.depth_normalization_type in [None, 'standardize', 'min_max'], f'Invalid depth normalization "{self.config.depth_normalization_type}"'
+        assert self.config.input_normalization_type in [
+            None, 'standardize', 'min_max'], f'Invalid input normalization "{self.config.input_normalization_type}"'
         assert self.config.image_output_type in ['linear', 'sigmoid'], f'Invalid image output type "{self.config.image_output_type}"'
         assert self.config.norm_depth_output_type in ['linear', 'sigmoid'], f'Invalid norm depth output type "{self.config.norm_depth_output_type}"'
         
         self.dmin, self.dmax = self.config.d_range
         self.dmin_log, self.dmax_log = math.log(self.dmin), math.log(self.dmax)
         
-        if self.config.depth_normalization_type == 'standardize':
-            # self.imean, self.istd = [nn.Parameter(torch.tensor(t)) for t in (0.0, 1.0)]
-            self.dmean, self.dstd = [nn.Parameter(torch.tensor(t)) for t in (0.0, 1.0)]
+        if self.config.input_normalization_type == 'standardize':
+            img_stats = get_input_norm_stats('image')
+            depth_stats = get_input_norm_stats('log_depth')
+            dmask_stats = get_input_norm_stats('depth_mask')
+            self.imean, self.istd = [nn.Parameter(torch.tensor(t).reshape(-1, 1, 1)) for t in img_stats]
+            self.dmean, self.dstd = [nn.Parameter(torch.tensor(t).reshape(-1, 1, 1)) for t in depth_stats]
+            self.dmaskmean, self.dmaskstd = [nn.Parameter(torch.tensor(t).reshape(-1, 1, 1)) for t in dmask_stats]
         
         self.transformer = Encoder(
             self.config.n_layers,
@@ -88,50 +93,46 @@ class VDST(nn.Module):
     def normalize_sources(self, images, depths, depth_masks):
         eps = 1e-8
         
-        # if self.config.depth_normalization_type != 'standardize':
-        images = images * 2.0 - 1.0
+        depth_masks = depth_masks.float()
         
-        depth_masks = depth_masks.float() * 2.0 - 1.0
-        
-        if self.config.depth_normalization_type == 'min_max':
+        if self.config.input_normalization_type == 'min_max':
+            images = images * 2.0 - 1.0
+            
             depths = normalize_depths(depths, self.dmin_log, self.dmax_log)
             depths = depths * 2.0 - 1.0
+            
+            depth_masks = depth_masks * 2.0 - 1.0
         else:
             depths = (depths + eps).log()
             
-            if self.config.depth_normalization_type == 'standardize':
-                dmean, dstd = self.dmean, self.dstd
-                depths = (depths - dmean) / (dstd + eps)
-                # images = (images - self.imean) / (self.istd + eps)
+            if self.config.input_normalization_type == 'standardize':
+                images = (images - self.imean) / (self.istd + eps)
+                depths = (depths - self.dmean) / (self.dstd + eps)
+                depth_masks = (depth_masks - self.dmaskmean) / (self.dmaskstd + eps)
         
         return images, depths, depth_masks
     
     def denormalize_targets(self, images, depths):
-        norm_depths = None
-        
-        if self.config.image_output_type == 'sigmoid':
-            images = torch.sigmoid(images)
-        else:
-            # if self.config.depth_normalization_type != 'standardize':
-            images = (images + 1.0) * 0.5
-        
-        if self.config.depth_normalization_type == 'min_max':
+        if self.config.input_normalization_type == 'min_max':
+            if self.config.image_output_type == 'sigmoid':
+                images = torch.sigmoid(images)
+            else:
+                images = (images + 1.0) * 0.5
+            
             if self.config.norm_depth_output_type == 'sigmoid':
                 # Seems to be worse with sigmoid
-                norm_depths = torch.sigmoid(depths)
+                depths = torch.sigmoid(depths)
             else:
-                norm_depths = (depths + 1.0) * 0.5
-            
-            depths = denormalize_depths(norm_depths, self.dmin_log, self.dmax_log)
+                depths = (depths + 1.0) * 0.5
+            depths = denormalize_depths(depths, self.dmin_log, self.dmax_log)
         else:
-            if self.config.depth_normalization_type == 'standardize':
-                dmean, dstd = self.dmean, self.dstd
-                depths = dstd * depths + dmean
-                # images = self.istd * images + self.imean
+            if self.config.input_normalization_type == 'standardize':
+                images = self.istd * images + self.imean
+                depths = self.dstd * depths + self.dmean
             
             depths = depths.exp()
         
-        return images, depths, norm_depths
+        return images, depths
     
     # Shape: (B, F, C, H, W)
     def forward(self, scene):
@@ -169,18 +170,18 @@ class VDST(nn.Module):
             depths=targets.depths,
             depth_masks=targets_depth_masks
         )
-
+        
         source_embeds, _ = self.pose_encoder_source(sources)
         query_embeds, pad = self.pose_encoder_query(queries)
         targets_hw_padded = targets_hw[0] + pad[2] + pad[3], targets_hw[1] + pad[0] + pad[1]
-
+        
         orig_query_shape = query_embeds.shape
         source_embeds, query_embeds = [einx.id('... v n d -> (...) (v n) d', t) for t in (source_embeds, query_embeds)]
         in_embeds = torch.concat([source_embeds, query_embeds], dim=-2)
         out_embeds = self.transformer(in_embeds)
         out_embeds = out_embeds[..., -query_embeds.shape[-2]:, :]
         out_embeds = out_embeds.reshape(orig_query_shape)
-
+        
         if self.config.dec_layer_norm:
             norm_out_img_embeds, norm_out_depth_embeds = self.image_decoder_norm(out_embeds), self.depth_decoder_norm(out_embeds)
             if self.config.dec_residual_layer_norm:
@@ -203,7 +204,7 @@ class VDST(nn.Module):
         ]
         out_images, out_depths = [t[..., pad[2]:t.shape[-2]-pad[3], pad[0]:t.shape[-1]-pad[1]] for t in (out_images_padded, out_depths_padded)]
         
-        gen_images, gen_depths, gen_norm_depths = self.denormalize_targets(out_images, out_depths)
+        gen_images, gen_depths = self.denormalize_targets(out_images, out_depths)
         gen_targets = edict(
             K=targets.K,
             R=targets.R,
@@ -211,7 +212,6 @@ class VDST(nn.Module):
             hw=targets_hw,
             images=gen_images,
             depths=gen_depths,
-            norm_depths=gen_norm_depths,
             # depth_masks=gen_depth_masks # TODO maybe gen this
         )
         

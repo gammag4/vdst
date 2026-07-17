@@ -11,7 +11,7 @@ from torchvision.models import ConvNeXt_Tiny_Weights
 # if the range changes, these need to be recomputed for the new range
 # fix this so that it can be normalized for range shifts (they were computed from the formula in loss.py)
 # The stats from CO3D were estimated from the processed dataset, so they are different from the ones from the full raw dataset
-def create_input_normalizer(input_type, is_diff):
+def get_input_norm_stats(input_type, is_diff=False):
     if input_type == 'image':
         # imagenet_1k
         convnext_transforms = ConvNeXt_Tiny_Weights.DEFAULT.transforms()
@@ -19,11 +19,20 @@ def create_input_normalizer(input_type, is_diff):
     elif input_type == 'log_depth':
         # co3d log_depth
         m, s = [-0.2749], [0.9187]
+    elif input_type == 'depth_mask':
+        # co3d depth_mask
+        m, s = [0.8591], [0.3479]
     else:
         assert False, f'Invalid input type "{input_type}"'
     
     if is_diff:
         m, s = [0.0] * len(m), [i * (2 ** 0.5) for i in s]
+    
+    return m, s
+
+
+def create_input_normalizer(input_type, is_diff=False):
+    m, s = get_input_norm_stats(input_type, is_diff)
     
     return T.Normalize(mean=m, std=s)
 

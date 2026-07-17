@@ -94,7 +94,7 @@ train:
     # Whether to load only weights, should be false only for checkpoints from trusted sources
     weights_only: false
     # Save checkpoints after every n steps (forward/backward pass)
-    checkpoint_steps_interval: 10000
+    checkpoint_steps_interval: 1000
 
   data:
     # Num workers per GPU
@@ -122,7 +122,7 @@ train:
     # weights: [3.0, 0.5, 1.0, 1.0, 0.4]
     # weights: [2.0, 1.0, 1.0, 1.0, 1.0]
     # weights: [0.5, 1.0, 0.5, 1.0, 0.5]
-    weights: [0.16, 6.3, 0.12, 0.13, 0.1]
+    weights: [0.5, 10.0, 0.12, 0.2, 0.5]
     should_normalize_weights: true
     # Perceptual loss config
     perceptual:
@@ -161,7 +161,7 @@ train:
     # SILog loss config
     silog:
       # How much to penalize absolute scale errors
-      scale_lambda: 0.15
+      scale_lambda: 0.15 #TODO check .5
 
 # Default model configuration
 model:
@@ -181,7 +181,7 @@ model:
   depth_input_type: depth # TODO implement 'spatial'
   # Whether the model also has input depth masks to know whether pixels are valid or not
   # This is ignored if depth_input_type is null
-  has_input_depth_masks: true
+  has_input_depth_masks: false
 
   # Number of layers in transformer
   n_layers: 6

@@ -158,7 +158,8 @@ class PoseEncoder(nn.Module):
             images = F.pad(images, pad, 'constant', 0)
             if self.config.depth_input_type is not None:
                 depths = F.pad(depths, pad, 'constant', 0)
-                norm_depth_masks = F.pad(norm_depth_masks, pad, 'constant', 0.0)
+                if self.config.has_input_depth_masks:
+                    norm_depth_masks = F.pad(norm_depth_masks, pad, 'constant', 0.0)
         
         o, d = compute_view_rays(K, R, t, pad, hw)
         

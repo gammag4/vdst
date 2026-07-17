@@ -33,7 +33,8 @@ class VDST(nn.Module):
             dmask_stats = get_input_norm_stats('depth_mask')
             self.imean, self.istd = [nn.Parameter(torch.tensor(t).reshape(-1, 1, 1)) for t in img_stats]
             self.dmean, self.dstd = [nn.Parameter(torch.tensor(t).reshape(-1, 1, 1)) for t in depth_stats]
-            self.dmaskmean, self.dmaskstd = [nn.Parameter(torch.tensor(t).reshape(-1, 1, 1)) for t in dmask_stats]
+            if self.config.has_input_depth_masks:
+                self.dmaskmean, self.dmaskstd = [nn.Parameter(torch.tensor(t).reshape(-1, 1, 1)) for t in dmask_stats]
         
         self.transformer = Encoder(
             self.config.n_layers,
@@ -93,7 +94,7 @@ class VDST(nn.Module):
     def normalize_sources(self, images, depths, depth_masks):
         eps = 1e-8
         
-        depth_masks = depth_masks.float()
+        depth_masks = depth_masks.float() if self.config.has_input_depth_masks else None
         
         if self.config.input_normalization_type == 'min_max':
             images = images * 2.0 - 1.0
@@ -101,14 +102,16 @@ class VDST(nn.Module):
             depths = normalize_depths(depths, self.dmin_log, self.dmax_log)
             depths = depths * 2.0 - 1.0
             
-            depth_masks = depth_masks * 2.0 - 1.0
+            if self.config.has_input_depth_masks:
+                depth_masks = depth_masks * 2.0 - 1.0
         else:
             depths = (depths + eps).log()
             
             if self.config.input_normalization_type == 'standardize':
                 images = (images - self.imean) / (self.istd + eps)
                 depths = (depths - self.dmean) / (self.dstd + eps)
-                depth_masks = (depth_masks - self.dmaskmean) / (self.dmaskstd + eps)
+                if self.config.has_input_depth_masks:
+                    depth_masks = (depth_masks - self.dmaskmean) / (self.dmaskstd + eps)
         
         return images, depths, depth_masks
     

@@ -112,8 +112,11 @@ class PerceptualLossScheduler(LossScheduler):
             self.original_weights = self.original_weights.to(self.loss.weights.device)
         
         perc = min(1.0, 1.3 * self.iter / self.n_iter) # 1.3 is to make it fall faster than the cosine lr
-        c = math.cos((perc - 1) * math.pi) / 2 + 0.5
-        r = 0.1
+        # c = math.cos((perc - 1) * math.pi) / 2 + 0.5
+        c = perc
+        # c = math.log(perc + 1) / math.log(2)
+        # c = 1 - (1 - perc ** (1 / 4)) ** 4
+        r = 0.01
         fall1 = (r - 1) * c + 1  # goes from 1 to r
         fall2 = 1 - c  # goes from 1 to 0
         fall3 = 1 - c  # goes from 1 to 0

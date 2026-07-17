@@ -2,6 +2,8 @@
 
 | English | [Português](README_PT.md) |
 
+https://github.com/user-attachments/assets/35a33c5e-fd6a-473b-b55a-ea6f4a667a93
+
 This is the implementation of the VDST model, together with code to train it with the datasets originally used.
 
 It is an RGB-D Novel View Synthesis model, where given a set of images and depths from a 3D scene with their respective camera properties/poses,
@@ -27,11 +29,15 @@ Main advantages this model has in comparison to other methods for RGB-D NVS:
   although we do not have enough computational resources to verify this, leaving it for future work;
 - It can be trained under constrained resources without diverging (the author used a single RTX 4060 Ti with 8GB VRAM).
 
-The trained model weights can be found [here](https://huggingface.co/gammag7/vdst).
+Main limitation of this model:
+This model was trained under heavy resource constraints, where, as stated before, we only had a single NVIDIA RTX 4060 Ti 8GB VRAM to train the model, an environment more constrained even than that of other generalizable joint view and depth synthesis models trained under resource constraints, which commonly use one NVIDIA A100 80GB VRAM or similar.
+This forced us to use a way smaller model in comparison to others (our model has 43.5M parameters, while other models like [LVSM](https://haian-jin.github.io/projects/LVSM/) or [MVGD](https://mvgd.github.io/) have around 400-600M parameters), and prevented us from training the model until convergence, which causes it to still have some visual artifacts.
 
 ### Results
 
 Here are some of the results from the model after trained with batch size 4 for 350000 iterations with an RTX 4060 Ti with 8GB VRAM, which took around 6 days.
+
+Number of parameters: 43.46M.
 
 Metrics:
 
@@ -60,13 +66,11 @@ Test new category set (`truck` category):
 
 <img src="Architecture.png" width="800px" alt="Architecture">
 
-## Rendering
+## Inference
+
+The trained model weights can be found [here](https://huggingface.co/gammag7/vdst).
 
 We also made a renderer that you can use to navigate on the scenes using this model, you can check it out [here](https://github.com/gammag4/nvs_renderer).
-
-Rendering a scene:
-
-https://github.com/user-attachments/assets/35a33c5e-fd6a-473b-b55a-ea6f4a667a93
 
 ## Dataset
 

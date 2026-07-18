@@ -2,8 +2,6 @@
 
 | English | [Português](README_PT.md) |
 
-https://github.com/user-attachments/assets/35a33c5e-fd6a-473b-b55a-ea6f4a667a93
-
 This is the implementation of the VDST model, together with code to train it with the datasets originally used.
 
 It is an RGB-D Novel View Synthesis model, where given a set of images and depths from a 3D scene with their respective camera properties/poses,
@@ -11,6 +9,16 @@ the model aims to generate a new view/depth in the scene, given the camera prope
 
 This model was inspired primarily by the architecture and phylosophy of [LVSM](https://haian-jin.github.io/projects/LVSM/),
 where it applies its same core idea to the task of RGB-D Novel View Synthesis.
+
+### Rendered scene example
+
+Rendered scene:
+
+<https://github.com/user-attachments/assets/35a33c5e-fd6a-473b-b55a-ea6f4a667a93>
+
+Source images:
+
+![Source images](final_results/render/sources.png)
 
 ### Results
 

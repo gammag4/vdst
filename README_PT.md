@@ -2,8 +2,6 @@
 
 | [English](README.md) | Português |
 
-https://github.com/user-attachments/assets/35a33c5e-fd6a-473b-b55a-ea6f4a667a93
-
 Essa é a implementação do modelo VDST, junto com o código para treiná-lo com os datasets usados originalmente.
 
 Este é um modelo de RGB-D Novel View Synthesis, onde dadas um conjunto de visões de uma cena 3D com respectivos mapas de distâncias e propriedades/poses de câmera destas,
@@ -11,6 +9,16 @@ o modelo busca gerar uma nova visão com respectivo mapa de distância na cena, 
 
 Esse modelo foi inspirado primariamente pela arquitetura e filosofia de [LVSM](https://haian-jin.github.io/projects/LVSM/),
 onde ele aplica a mesma ideia central para a tarefa de Novel View Synthesis RGB-D.
+
+### Exemplo de cena renderizada
+
+Cena renderizada:
+
+<https://github.com/user-attachments/assets/35a33c5e-fd6a-473b-b55a-ea6f4a667a93>
+
+Imagens-fonte:
+
+![Imagens-fonte](final_results/render/sources.png)
 
 ### Resultados
 

@@ -12,27 +12,6 @@ the model aims to generate a new view/depth in the scene, given the camera prope
 This model was inspired primarily by the architecture and phylosophy of [LVSM](https://haian-jin.github.io/projects/LVSM/),
 where it applies its same core idea to the task of RGB-D Novel View Synthesis.
 
-Main contributions:
-
-- The architecture (VDST);
-- A variation of perceptual loss using ConvNeXt instead of VGG-19;
-- A perceptual loss for depth maps based in ConvNeXt with a second CNN specific for estimating the receptive field and allow using masks of invalid values in the loss latents;
-- A processing pipeline for datasets of RGB-D scenes that allows isolating the evaluation of content generation and view interpolation in the new generated views.
-
-Main advantages this model has in comparison to other methods for RGB-D NVS:
-
-- Due to the generalization ability of Transformer-based models across domains, it is capable of:
-  - Generalizing to novel scenes that follow a similar distribution to the original training data;
-  - Doing few-shot NVS, needing only two source images or even just a single one in most cases for generating new views;
-- Following the same approach as LVSM, our architecture also tries to minimize the inductive bias of the model,
-  and we hypothesize that this allows it to achieve better results than other methods when trained for longer periods with sufficiently large amounts of data,
-  although we do not have enough computational resources to verify this, leaving it for future work;
-- It can be trained under constrained resources without diverging (the author used a single RTX 4060 Ti with 8GB VRAM).
-
-Main limitation of this model:
-This model was trained under heavy resource constraints, where, as stated before, we only had a single NVIDIA RTX 4060 Ti 8GB VRAM to train the model, an environment more constrained even than that of other generalizable joint view and depth synthesis models trained under resource constraints, which commonly use one NVIDIA A100 80GB VRAM or similar.
-This forced us to use a way smaller model in comparison to others (our model has 43.5M parameters, while other models like [LVSM](https://haian-jin.github.io/projects/LVSM/) or [MVGD](https://mvgd.github.io/) have around 400-600M parameters), and prevented us from training the model until convergence, which causes it to still have some visual artifacts.
-
 ### Results
 
 Here are some of the results from the model after trained with batch size 4 for 350000 iterations with an RTX 4060 Ti with 8GB VRAM, which took around 6 days.
@@ -65,6 +44,29 @@ Test new category set (`truck` category):
 ### Architecture
 
 <img src="Architecture.png" width="800px" alt="Architecture">
+
+### Contributions and limitations
+
+Main contributions:
+
+- The architecture (VDST);
+- A variation of perceptual loss using ConvNeXt instead of VGG-19;
+- A perceptual loss for depth maps based in ConvNeXt with a second CNN specific for estimating the receptive field and allow using masks of invalid values in the loss latents;
+- A processing pipeline for datasets of RGB-D scenes that allows isolating the evaluation of content generation and view interpolation in the new generated views.
+
+Main advantages this model has in comparison to other methods for RGB-D NVS:
+
+- Due to the generalization ability of Transformer-based models across domains, it is capable of:
+  - Generalizing to novel scenes that follow a similar distribution to the original training data;
+  - Doing few-shot NVS, needing only two source images or even just a single one in most cases for generating new views;
+- Following the same approach as LVSM, our architecture also tries to minimize the inductive bias of the model,
+  and we hypothesize that this allows it to achieve better results than other methods when trained for longer periods with sufficiently large amounts of data,
+  although we do not have enough computational resources to verify this, leaving it for future work;
+- It can be trained under constrained resources without diverging (the author used a single RTX 4060 Ti with 8GB VRAM).
+
+Main limitation of this model:
+This model was trained under heavy resource constraints, where, as stated before, we only had a single NVIDIA RTX 4060 Ti 8GB VRAM to train the model, an environment more constrained even than that of other generalizable joint view and depth synthesis models trained under resource constraints, which commonly use one NVIDIA A100 80GB VRAM or similar.
+This forced us to use a way smaller model in comparison to others (our model has 43.5M parameters, while other models like [LVSM](https://haian-jin.github.io/projects/LVSM/) or [MVGD](https://mvgd.github.io/) have around 400-600M parameters), and prevented us from training the model until convergence, which causes it to still have some visual artifacts.
 
 ## Inference
 

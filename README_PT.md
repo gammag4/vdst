@@ -22,7 +22,7 @@ Imagens-fonte:
 
 ### Resultados
 
-Aqui estão alguns dos resultados do modelo depois de treinado com batch size 4 por 350000 iterações usando uma RTX 4060 Ti com 8GB de VRAM, durando em torno de 6 dias.
+Aqui estão alguns dos resultados do modelo depois de treinado com batch size 4 por 350000 iterações usando uma RTX 4060 Ti com 8GB de VRAM, durando em torno de 153 horas.
 
 Número de parâmetros: 43.46M.
 

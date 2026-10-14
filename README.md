@@ -20,6 +20,62 @@ Source images:
 
 ![Source images](final_results/render/sources.png)
 
+### Architecture
+
+<img src="Architecture.png" width="800px" alt="Architecture">
+
+#### Process
+
+Inputs:
+- Images $I_k \in [0, 1]^{3 \times W \times H}$;
+- Depth maps $D_k \in \mathbb{R}_+^{W \times H}$;
+- Depth masks $M_k \in \{ 0, 1 \}^{W \times H}$;
+- Intrinsic matrices $K_k \in \mathbb{R}^{3 \times 3}$;
+- Extrinsic matrices $E_k \in \mathbb{R}^{4 \times 4}$;
+
+Outputs:
+- Target image $I_{\mathrm{target}} \in [0, 1]^{3 \times W \times H}$;
+- Target depth map $D_{\mathrm{target}} \in \mathbb{R}_+^{W \times H}$;
+
+The target images are given by:
+
+$$
+\begin{align}
+[I_k, D_k] &= \left[\frac{I_{k, \mathrm{raw}} - i_{\mu}}{i_{\sigma} + \varepsilon}, \frac{\log(D_{k, \mathrm{raw}} + \varepsilon) - d_{\mu}}{d_{\sigma} + \varepsilon} \right] & \text{ (normalized sources)} \\
+\begin{bmatrix} R_k & \mathbf{t}_k \\ 0 & 1 \end{bmatrix} &= E_k & \text{ (rotation/translation)} \\
+\mathbf{v}_{ij} &= [i + 0.5, j + 0.5, 1] & \text{ (raw pixel center vectors)} \\
+[\mathbf{o}_{k, ij}, \mathbf{d}_{k, ij}] &= [\mathbf{t}_k, R_k K_k^{-1} \mathbf{v}_{ij}] & \text{ (inverse projection (c2w))} \\
+O_{k, ij} &= [\mathbf{d}_{k, ij}, \mathbf{o}_{k, ij} \times \mathbf{d}_{k, ij}] & \text{ (Plücker embedding)} \\
+\mathrm{Tokenize}(P) &= P W_{P} + b_P & \text{ (linearly maps to tokens)} \\
+X &= \mathrm{Tokenize}(\mathrm{Patchify}([[O_1, I_1, D_1], \dots, [O_N, I_N, D_N]])) & \text{ (concat, patchify and tokenize sources)} \\
+Q &= \mathrm{Tokenize}(\mathrm{Patchify}([O_1, \dots, O_N])) & \text{ (concat, patchify and tokenize queries)} \\
+[X_{discard}, Y] &= \mathrm{Transformer}([X, Q]) & \text{ (output tokens)} \\
+[I_{\mathrm{target}, \mathrm{raw}}, D_{\mathrm{target}, \mathrm{raw}}] &= \mathrm{Depatchify}(\mathrm{Detokenize}(Y)) & \text{ (normalized targets)} \\
+[I_{\mathrm{target}}, D_{\mathrm{target}}] &= [i_{\sigma} I_{\mathrm{target}, \mathrm{raw}} + i_{\mu}, e^{d_{\sigma} D_{\mathrm{target}, \mathrm{raw}} + d_{\mu}}] & \text{ (denormalized targets)}, \\
+\end{align}
+$$
+
+where $\mathrm{Transformer}(\cdot)$ is the transformer, implemented with pre-layer normalization in the residual blocks and query-key normalization in the attention.
+
+The loss is given by:
+
+$$
+\begin{align}
+\mathcal{L}([I_{\mathrm{target}}, D_{\mathrm{target}}], [\hat{I}_{\mathrm{target}}, \hat{D}_{\mathrm{target}}]) &= \mathcal{L}_I(I_{\mathrm{target}}, \hat{I}_{\mathrm{target}}) + \mathcal{L}_D(D_{\mathrm{target}}, \hat{D}_{\mathrm{target}}) \\
+\mathcal{L}_{I}(I, \hat{I}) &= \lambda_{I, \mathrm{MSE}} \mathcal{L}_{I, \mathrm{MSE}}(I, \hat{I}) + \lambda_{I, \mathrm{Percep}} \mathcal{L}_{I, \mathrm{Percep}}(I, \hat{I}) \\
+\mathcal{L}_{D}(D, \hat{D}) &= \lambda_{D, \mathrm{SILog}} \mathcal{L}_{D, \mathrm{SILog}}(D, \hat{D}) + \lambda_{D, \mathrm{grad}} \mathcal{L}_{D, \mathrm{grad}}(D, \hat{D}) + \lambda_{D, \mathrm{Percep}} \mathcal{L}_{D, \mathrm{Percep}}(D, \hat{D}) \\
+\mathcal{L}_{I, \mathrm{MSE}}(I, \hat{I}) &= \mathrm{MSE}(I, \hat{I}) \\
+\mathcal{L}_{I, \mathrm{Percep}}(I, \hat{I}) &= \frac{1}{N_{\mathrm{layers}} C_l H_l W_l} \sum_{l = 1}^{N_{\mathrm{layers}}} \lambda_l \left\| \phi_l\left( \frac{I - \mu_I}{\sigma_I} \right) - \phi_l\left( \frac{\hat{I} - \mu_I}{\sigma_I} \right) \right\|_1 \\
+\mathcal{L}_{D, \mathrm{SILog}}(D, \hat{D}) &= \mathrm{MSE}(\log(D), \log(\hat{D})) - \lambda \mathrm{ME}(\log(D), \log(\hat{D}))^2 \\
+\mathcal{L}_{D, \mathrm{Grad}}(D, \hat{D}) &= \frac{1}{N_{\mathrm{scale}} C_l H_l W_l} \sum_{l = 1}^{N_{\mathrm{scale}}} |\nabla_X (D_l - \hat{D}_l)| + |\nabla_Y (D_l - \hat{D}_l)| \\
+\mathcal{L}_{D, \mathrm{Percep}}(D, \hat{D}) &= \mathcal{L}_{I, \mathrm{Percep}} \left( \frac{\log(D) - \log(\hat{D})}{\sqrt{2} \sigma_{\log, D}}, \mathbf{0} \right), \\
+\end{align}
+$$
+
+where each $\phi_l(\cdot)$ in the perceptual loss is the mapping for each layer $l$ of the chosen layers from ConvNeXt,
+$\mu_{D, Percep} = \mu_{\log, D} - \mu_{\log, D} = 0$, $\sigma_{D, Percep} = \sqrt{\sigma^2_{\log, D} + \sigma^2_{\log, D}} = \sqrt{2} \sigma_{\log, D}$,
+and $\mu_I, \sigma_I, \mu_{\log, D}, \sigma_{\log, D}$ are the means and stds for images and log-depths computed for the entire dataset.
+
 ### Results
 
 Here are some of the results from the model after trained with batch size 4 for 350000 iterations with an RTX 4060 Ti with 8GB VRAM, which took around 153 hours.
@@ -48,10 +104,6 @@ Test set:
 Test new category set (`truck` category):
 
 ![Results in test new category set](final_results/test_new_category/targets_0_val.png)
-
-### Architecture
-
-<img src="Architecture.png" width="800px" alt="Architecture">
 
 ### Contributions and limitations
 

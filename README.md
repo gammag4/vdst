@@ -173,6 +173,7 @@ Create the Python environment and install dependencies:
 ```sh
 conda create -n vdst python=3.13
 conda activate vdst
+pip install -r requirements-torch.txt
 pip install -r requirements.txt
 ```
 

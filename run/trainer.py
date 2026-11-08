@@ -155,7 +155,9 @@ class DistributedTrainer(ABC):
         config = self.config.train.checkpoints
         
         # Ensures only saves from first GPU to prevent redundancy
-        if not self.is_last and (self.current_step == 0 or not self.is_main_process or self.current_step % self.config.train.checkpoints.checkpoint_steps_interval != 0):
+        if not self.is_main_process:
+            return
+        if not self.is_last and (self.current_step == 0 or self.current_step % self.config.train.checkpoints.checkpoint_steps_interval != 0):
             return
         
         torch.accelerator.synchronize(self.device)

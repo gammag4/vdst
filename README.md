@@ -24,18 +24,48 @@ Source images:
 
 <img src="Architecture.png" width="800px" alt="Architecture">
 
-#### Process
+#### Problem
 
-Inputs:
-- Images $I_k \in [0, 1]^{3 \times W \times H}$;
-- Depth maps $D_k \in \mathbb{R}_+^{W \times H}$;
-- Depth masks $M_k \in \{ 0, 1 \}^{W \times H}$;
-- Intrinsic matrices $K_k \in \mathbb{R}^{3 \times 3}$;
-- Extrinsic matrices $E_k \in \mathbb{R}^{4 \times 4}$;
+Each of the $N$ scenes is given by:
 
-Outputs:
-- Target image $I_{\mathrm{target}} \in [0, 1]^{3 \times W \times H}$;
-- Target depth map $D_{\mathrm{target}} \in \mathbb{R}_+^{W \times H}$;
+$$
+\mathcal{S}_i = \{ (I_{k, i}, D_{k, i}, M_{k, i}, K_{k, i}, E_{k, i}) \}_{1 \leq k \leq n}, 1 \leq i \leq N,
+$$
+
+with:
+- Images $I_{k, i} \in [0, 1]^{3 \times W \times H}$;
+- Depth maps $D_{k, i} \in \mathbb{R}_+^{W \times H}$;
+- Depth masks $M_{k, i} \in \{ 0, 1 \}^{W \times H}$;
+- Intrinsic matrices $K_{k, i} \in \mathcal{K}$;
+- Extrinsic matrices $E_{k, i} \in SE(3)$.
+
+Each target camera pose is given by:
+$$
+\mathcal{C}_{t, i} = (K_{t, i}, E_{t, i})
+$$
+with:
+- Target intrinsic matrix $K_{t, i} \in \mathcal{K}$;
+- Target extrinsic matrix $E_{t, i} \in SE(3)$.
+
+Our goal is to find the parameters $\theta^*$ that minimize
+the expected prediction error over the distribution $\mathcal{P}$
+of scenes and source-target view configurations for
+the parametrized model $\mathcal{F}(\cdot; \theta)$
+given the $N$ sampled observations from that distribution:
+
+$$
+\begin{align}
+\theta^* &= \arg\min_\theta \mathbb{E}_{(\mathcal{S}, \mathcal{C}_t, I_t, D_t) \sim \mathcal{P}} \left[ \mathcal{L}([I_t, D_t], [\hat{I}_{t}, \hat{D}_{t}]) \right] \\
+[I_{t, i}, D_{t, i}] &\sim \mathcal{P}(\cdot | \mathcal{S}_i, \mathcal{C}_{t, i}) \\
+[\hat{I}_{t, i}, \hat{D}_{t, i}] &= \mathcal{F}(\mathcal{S}_i, \mathcal{C}_{t, i}; \theta)
+\end{align}
+$$
+
+with:
+- Target image $I_{t, i} \in [0, 1]^{3 \times W \times H}$;
+- Target depth map $D_{t, i} \in \mathbb{R}_+^{W \times H}$.
+
+#### Model
 
 The target images are given by:
 
@@ -50,24 +80,26 @@ O_{k, ij} &= [\mathbf{d}_{k, ij}, \mathbf{o}_{k, ij} \times \mathbf{d}_{k, ij}] 
 X &= \mathrm{Tokenize}(\mathrm{Patchify}([[O_1, I_1, D_1], \dots, [O_N, I_N, D_N]])) & \text{ (concat, patchify and tokenize sources)} \\
 Q &= \mathrm{Tokenize}(\mathrm{Patchify}([O_1, \dots, O_N])) & \text{ (concat, patchify and tokenize queries)} \\
 [X_{discard}, Y] &= \mathrm{Transformer}([X, Q]) & \text{ (output tokens)} \\
-[I_{\mathrm{target}, \mathrm{raw}}, D_{\mathrm{target}, \mathrm{raw}}] &= \mathrm{Depatchify}(\mathrm{Detokenize}(Y)) & \text{ (normalized targets)} \\
-[I_{\mathrm{target}}, D_{\mathrm{target}}] &= [i_{\sigma} I_{\mathrm{target}, \mathrm{raw}} + i_{\mu}, e^{d_{\sigma} D_{\mathrm{target}, \mathrm{raw}} + d_{\mu}}] & \text{ (denormalized targets)}, \\
+[I_{t, \mathrm{raw}}, D_{t, \mathrm{raw}}] &= \mathrm{Depatchify}(\mathrm{Detokenize}(Y)) & \text{ (normalized targets)} \\
+[I_{t}, D_{t}] &= [i_{\sigma} I_{t, \mathrm{raw}} + i_{\mu}, e^{d_{\sigma} D_{t, \mathrm{raw}} + d_{\mu}}] & \text{ (denormalized targets)}, \\
 \end{align}
 $$
 
 where $\mathrm{Transformer}(\cdot)$ is the transformer, implemented with pre-layer normalization in the residual blocks and query-key normalization in the attention.
 
+#### Loss
+
 The loss is given by:
 
 $$
 \begin{align}
-\mathcal{L}([I_{\mathrm{target}}, D_{\mathrm{target}}], [\hat{I}_{\mathrm{target}}, \hat{D}_{\mathrm{target}}]) &= \mathcal{L}_I(I_{\mathrm{target}}, \hat{I}_{\mathrm{target}}) + \mathcal{L}_D(D_{\mathrm{target}}, \hat{D}_{\mathrm{target}}) \\
+\mathcal{L}([I_{t}, D_{t}], [\hat{I}_{t}, \hat{D}_{t}]) &= \mathcal{L}_I(I_{t}, \hat{I}_{t}) + \mathcal{L}_D(D_{t}, \hat{D}_{t}) \\
 \mathcal{L}_{I}(I, \hat{I}) &= \lambda_{I, \mathrm{MSE}} \mathcal{L}_{I, \mathrm{MSE}}(I, \hat{I}) + \lambda_{I, \mathrm{Percep}} \mathcal{L}_{I, \mathrm{Percep}}(I, \hat{I}) \\
 \mathcal{L}_{D}(D, \hat{D}) &= \lambda_{D, \mathrm{SILog}} \mathcal{L}_{D, \mathrm{SILog}}(D, \hat{D}) + \lambda_{D, \mathrm{grad}} \mathcal{L}_{D, \mathrm{grad}}(D, \hat{D}) + \lambda_{D, \mathrm{Percep}} \mathcal{L}_{D, \mathrm{Percep}}(D, \hat{D}) \\
 \mathcal{L}_{I, \mathrm{MSE}}(I, \hat{I}) &= \mathrm{MSE}(I, \hat{I}) \\
-\mathcal{L}_{I, \mathrm{Percep}}(I, \hat{I}) &= \frac{1}{N_{\mathrm{layers}} C_l H_l W_l} \sum_{l = 1}^{N_{\mathrm{layers}}} \lambda_l \left\| \phi_l\left( \frac{I - \mu_I}{\sigma_I} \right) - \phi_l\left( \frac{\hat{I} - \mu_I}{\sigma_I} \right) \right\|_1 \\
+\mathcal{L}_{I, \mathrm{Percep}}(I, \hat{I}) &= \frac{1}{N_{\mathrm{layers}}} \sum_{l = 1}^{N_{\mathrm{layers}}} \frac{\lambda_l}{C_l H_l W_l} \left\| \phi_l\left( \frac{I - \mu_I}{\sigma_I} \right) - \phi_l\left( \frac{\hat{I} - \mu_I}{\sigma_I} \right) \right\|_1 \\
 \mathcal{L}_{D, \mathrm{SILog}}(D, \hat{D}) &= \mathrm{MSE}(\log(D), \log(\hat{D})) - \lambda \mathrm{ME}(\log(D), \log(\hat{D}))^2 \\
-\mathcal{L}_{D, \mathrm{Grad}}(D, \hat{D}) &= \frac{1}{N_{\mathrm{scale}} C_l H_l W_l} \sum_{l = 1}^{N_{\mathrm{scale}}} |\nabla_X (D_l - \hat{D}_l)| + |\nabla_Y (D_l - \hat{D}_l)| \\
+\mathcal{L}_{D, \mathrm{Grad}}(D, \hat{D}) &= \frac{1}{N_{\mathrm{scale}}} \sum_{l = 1}^{N_{\mathrm{scale}}} \frac{\|\nabla_X (D_l - \hat{D}_l)\|_1 + \|\nabla_Y (D_l - \hat{D}_l)\|_1}{C_l H_l W_l} \\
 \mathcal{L}_{D, \mathrm{Percep}}(D, \hat{D}) &= \mathcal{L}_{I, \mathrm{Percep}} \left( \frac{\log(D) - \log(\hat{D})}{\sqrt{2} \sigma_{\log, D}}, \mathbf{0} \right), \\
 \end{align}
 $$
